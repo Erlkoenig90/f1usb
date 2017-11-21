@@ -69,17 +69,17 @@ class UsbMem {
 static_assert (sizeof(UsbMem) == 4, "");
 
 /**
- * Enthält ein Array namens "data" aus UsbMem, wobei N/2 (aufrundend) als Größe angenommen wird. Kann genutzt werden,
+ * Enthält ein Array namens "data" aus UsbMem, wobei N/2 als Größe angenommen wird. Kann genutzt werden,
  * um Pufferspeicher im USB-RAM für Endpoints zu definieren, indem Bytes statt 16bit-Wörtern als Größe angegeben werden können.
  * Dabei wird automatisch geprüft, ob die angeforderte Größe von der Hardware unterstützt wird.
  */
 template <size_t N>
 struct UsbAlloc {
-	static_assert ((N <= 62) || ((N <= 512) && (N % 32 == 0)), "Invalid reception buffer size requested");
+	static_assert (((N <= 62) && (N%2 == 0)) || ((N <= 512) && (N % 32 == 0)), "Invalid reception buffer size requested");
 	static constexpr size_t size = N;
 
 	/// Das eigentliche Daten-Array
-	UsbMem data [(N+1)/2];
+	UsbMem data [N/2];
 	/// Bietet Zugriff auf 16bit-Word "i".
 	usb_always_inline uint16_t& operator [] (size_t i) {
 		return data [i].data;
