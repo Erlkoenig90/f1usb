@@ -27,19 +27,19 @@
  * kann per writeAvailable() abgefragt werden.
  */
 uint8_t* DoubleBuffer::write () {
-	if (m_inFill == size)
+	if (m_inFill == singleSize ())
 		// Kein Platz zum schreiben
 		return nullptr;
 	else {
 		// Berechne Zeiger
 		m_writing = true;
-		return m_buffer [m_writeIndex] + m_inFill;
+		return buffer (m_writeIndex) + m_inFill;
 	}
 }
 
 /// Gibt die Anzahl derzeit beschreibbarer Bytes zurück.
 size_t DoubleBuffer::writeAvailable () const {
-	return size - m_inFill;
+	return singleSize () - m_inFill;
 }
 
 /**
@@ -49,7 +49,7 @@ size_t DoubleBuffer::writeAvailable () const {
 void DoubleBuffer::writeFinish (size_t length) {
 	m_writing = false;
 	m_inFill += length;
-	if (m_inFill == size)
+	if (m_inFill == singleSize ())
 		swap ();
 }
 
@@ -63,7 +63,7 @@ uint8_t* DoubleBuffer::read () {
 		return nullptr;
 	else
 		// Berechne Zeiger
-		return m_buffer [1-m_writeIndex] + m_outPtr;
+		return buffer (static_cast<uint8_t> (1-m_writeIndex)) + m_outPtr;
 }
 
 /// Gibt die Anzahl derzeit lesbarer Bytes zurück.

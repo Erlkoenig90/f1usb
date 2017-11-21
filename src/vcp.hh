@@ -80,10 +80,11 @@ class VCP_DataEP : public EPBuffer {
  */
 class VCP {
 	public:
-		constexpr VCP (uint8_t iUsart, UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t epBufferRXLength, uint16_t epBufferTXLength, uint8_t iDMA_RX, uint8_t iDMA_TX, uint8_t iMgmtEP, uint8_t iDataEP, Pin pinTX, Pin pinDTR, Pin pinRTS)
-			: m_lineCoding { 9600, 0, 0, 8 },
-					m_mgmtEP (iMgmtEP),
-					m_dataEP (*this, iDataEP, epBufferRX, epBufferRXLength, epBufferTX, epBufferTXLength),
+		constexpr VCP (uint8_t iUsart, UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t epBufferRXLength, uint16_t epBufferTXLength,
+						uint8_t iDMA_RX, uint8_t iDMA_TX, uint8_t iMgmtEP, uint8_t iDataEP, Pin pinTX, Pin pinDTR, Pin pinRTS,
+						uint8_t* intBuffer, size_t intBufferSize)
+					: m_usb2uartBuffer (intBuffer, intBufferSize / 2), m_uart2usbBuffer (intBuffer + intBufferSize / 2, intBufferSize / 2),
+					m_lineCoding { 9600, 0, 0, 8 }, m_mgmtEP (iMgmtEP), m_dataEP (*this, iDataEP, epBufferRX, epBufferRXLength, epBufferTX, epBufferTXLength),
 					m_pinTX (pinTX), m_pinDTR (pinDTR), m_pinRTS (pinRTS),
 					m_txUSBBytes (0), m_rxUSARTBytes (0), m_txUSARTBytes (0), m_USART_Prescaler (469),
 					m_USART (iUsart), m_iDMA_RX (iDMA_RX), m_iDMA_TX (iDMA_TX),

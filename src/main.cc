@@ -44,6 +44,9 @@ alignas(4) static UsbAlloc<64>	EP0_BUF	USB_MEM;
 alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_RX_BUF [3]	USB_MEM;
 alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_TX_BUF [3]	USB_MEM;
 
+/// Der tatsächliche Speicher für die Doppelpuffer der VCP's. Wird hier angelegt zur Initialisierung per ".bss"-Section.
+static uint8_t intBuffers [3][4096];
+
 /*
  * Pinbelegung der drei USARTS. In den Klammern stehen die Zuordnungen für das Olimexino-STM32:
  * VCP0: TX=PA9(D7), RX=PA10(D8), DTR=PA1(D3), RTS=PA5(D13)
@@ -55,9 +58,9 @@ alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_TX_BUF [3]	USB_MEM;
 
 /// Anlegen der drei Verwaltungsobjekte für die drei VCPs.
 VCP vcp [3] = {
-	{ 0, VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, VCP_RX_BUF [0].size, VCP_TX_BUF [0].size, 4, 3, 1, 2, { 0, 9 }, { 0, 1 }, { 0, 5 } },
-	{ 1, VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, VCP_RX_BUF [1].size, VCP_TX_BUF [1].size, 5, 6, 3, 4, { 0, 2 }, { 0, 6 }, { 0, 7 } },
-	{ 2, VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, VCP_RX_BUF [2].size, VCP_TX_BUF [2].size, 2, 1, 5, 6, { 1, 10 }, { 2, 0 }, { 2, 1 } }
+	{ 0, VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, VCP_RX_BUF [0].size, VCP_TX_BUF [0].size, 4, 3, 1, 2, { 0, 9 }, { 0, 1 }, { 0, 5 }, intBuffers[0], sizeof(intBuffers[0]) },
+	{ 1, VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, VCP_RX_BUF [1].size, VCP_TX_BUF [1].size, 5, 6, 3, 4, { 0, 2 }, { 0, 6 }, { 0, 7 }, intBuffers[1], sizeof(intBuffers[1]) },
+	{ 2, VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, VCP_RX_BUF [2].size, VCP_TX_BUF [2].size, 2, 1, 5, 6, { 1, 10 }, { 2, 0 }, { 2, 1 }, intBuffers[2], sizeof(intBuffers[2]) }
 };
 
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.

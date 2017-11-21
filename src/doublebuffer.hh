@@ -31,6 +31,7 @@
 
 /**
  * Implementiert einen einfachen Doppelpuffer. Es können immer ganze Datenblöcke gelesen bzw. geschrieben werden.
+ * Dem Konstruktor müssen Zeiger und Größe des tatsächlichen Speichers übergeben werden.
  * Der Puffer kann per DMA gelesen/geschrieben werden.
  *
  * Zum Schreiben sollten die Folge der Aufrufe sein:
@@ -47,9 +48,7 @@
  */
 class DoubleBuffer {
 	public:
-		constexpr DoubleBuffer () : m_buffer {}, m_inFill (0), m_outFill (0), m_outPtr (0), m_writeIndex (0), m_writing (false) {}
-		/// Gibt die Größe pro Puffer an
-		static constexpr size_t size = 1024;
+		constexpr DoubleBuffer (uint8_t* buffer, size_t size) : m_buffer (buffer), m_size (size / 2), m_inFill (0), m_outFill (0), m_outPtr (0), m_writeIndex (0), m_writing (false) {}
 
 		uint8_t* write ();
 		size_t writeAvailable () const;
@@ -62,8 +61,17 @@ class DoubleBuffer {
 		void reset ();
 		void swap ();
 	private:
-		/// Richte Puffer an 16-Byte-Grenze aus, damit DMA immer funktioniert
-		alignas(16) uint8_t m_buffer [2][size];
+		size_t singleSize () const { return m_size; }
+		uint8_t* buffer (uint8_t index) const { return m_buffer + (index * m_size); }
+
+		/**
+		 * Zeiger auf externe Puffer-Instanz. Indem der Puffer nicht direkt als Member-Variable angelegt wird,
+		 * kann die DoubleBuffer-Instanz direkt per "constexpr" initialisiert werden, und der Puffer per "bss"-Section.
+		 */
+		uint8_t* const m_buffer;
+		/// Speichert die Größe eines einzelnen der beiden Puffer
+		const size_t m_size;
+
 		/// Wie viele Bytes im Eingabepuffer beschrieben sind
 		size_t m_inFill;
 		/// Wie viele Bytes im Ausgabepuffer beschrieben sind
