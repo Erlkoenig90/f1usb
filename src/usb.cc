@@ -312,111 +312,27 @@ void EPBuffer::onReset () {
 void ControlEP::onReset () {
 	EPBuffer::onReset ();
 
-	m_data = nullptr; m_count = 0; m_remaining = 0;
-	m_state = CTRL_STATE::SETUP;
-
 	receiveControlPacket ();
 }
 
 /// Enthält den empfangenden Teil des Zustandsautomaten für Control Transfers.
-void ControlEP::onReceive (bool setup, size_t rxBytes) {
+void ControlEP::onReceive (bool setup, size_t) {
 	if (setup) {
-		// SETUP-Pakete sollten zwar nur auftreten wenn wir im "SETUP" Zustand sind (prüfe
-		// über assert), zur Erhöhung der Robustheit setzen wir den Zustandsautomat aber einfach zurück.
-		myassert (m_state == CTRL_STATE::SETUP);
-		m_data = nullptr; m_count = 0; m_remaining = 0;
-		m_state = CTRL_STATE::SETUP;
 		onSetupStage ();
 	} else {
-		switch (m_state) {
-			case CTRL_STATE::STATUS_IN:
-				// Wir haben ein 0-Byte-Paket als Bestätigung abgesendeter Daten empfangen
-
-				// Gehe zurück zum Anfang
-				m_state = CTRL_STATE::SETUP;
-				// Empfangspuffer erneut bereit machen
-				receiveControlPacket ();
-				// Benachrichtige höhere Protokollebene
-				onStatusStage (true);
-				break;
-			case CTRL_STATE::DATA_OUT:
-				// Es wurde Teil eines Datenblocks empfangen
-				{
-					// Wie viele Bytes tatsächlich noch gespeichert werden können
-					// (normalerweise sollten beide immer gleich sein)
-					size_t usableBytes = std::min (rxBytes, m_remaining);
-					if (usableBytes) {
-						// Speichere empfangene Daten
-						getReceivedData (m_data, usableBytes);
-						m_remaining -= usableBytes;
-						m_data += usableBytes;
-					}
-					// Leeres bzw. nicht-volles Datenpaket terminiert Sequenz
-					if (rxBytes <= getRxBufLength ()) {
-						onDataOut (m_count - m_remaining);
-					} else {
-						// Noch nicht fertig - berechne nächsten Puffer, bereite Empfang vor
-						receiveControlPacket ();
-					}
-				}
-				break;
-			default:
-				myassert (false);
-		}
+		onStatusStage (true);
+		receiveControlPacket ();
 	}
 }
 
 /// Enthält den sendenden Teil des Zustandsautomaten für Control Transfers.
 void ControlEP::onTransmit () {
-	switch (m_state) {
-		case CTRL_STATE::DATA_IN:
-			// Datenpaket abgesendet
-			size_t length;
-			if (m_remaining == 0) {
-				// Vorheriger Transfer hat die letzten Daten gesendet, welche genau lang genug
-				// für ein Paket waren. Sende daher ein 0-Paket, um Ende zu signalisieren
-				length = 0;
-				m_state = CTRL_STATE::DATA_IN_LAST;
-			} else if (m_remaining < getRxBufLength ()) {
-				// Daten sind kürzer als Paketgröße. Sende Rest der Daten als letztes Paket;
-				// Host erkennt dadurch Ende des Blocks
-				length = m_remaining;
-				m_state = CTRL_STATE::DATA_IN_LAST;
-			} else if (m_remaining == getRxBufLength ()) {
-				// Verbleibende Daten passen genau in ein Paket. Sende ab, und danach ein 0-Paket
-				length = m_remaining;
-				m_remaining = 0;
-			} else {
-				// Es sind mehr Daten zu senden, als in ein Paket passen. Sende ab und durchlaufe
-				// diese Abfrage erneut
-				length = getRxBufLength ();
-				m_remaining -= length;
-			}
-			transmitPacket (m_data, length);
-			// Merke Position im Puffer
-			m_data += length;
-			break;
-		case CTRL_STATE::DATA_IN_LAST:
-			// Letztes Paket abgesendet. Warte auf Bestätigung.
-			m_state = CTRL_STATE::STATUS_IN;
-			// Empfange ein 0-Paket
-			receivePacket (0);
-			// Benachrichtige nächste Protokollebene über erfolgreiches Absenden
-			onDataIn ();
-			break;
-		case CTRL_STATE::STATUS_OUT:
-			// Es wurde ein 0-Paket abgesendet.
-			// Beginne Zustandsautomaten von vorne
-			m_state = CTRL_STATE::SETUP;
-			// Empfangspuffer erneut bereit machen
-			receiveControlPacket ();
-
-			// Benachrichtige nächste Protokollebene über Übertragung des Status
-			onStatusStage (false);
-			break;
-		default:
-			myassert (false);
-	}
+	if (m_sendStatus) {
+		m_sendStatus = false;
+		onStatusStage (false);
+	} else
+		// Empfange Bestätigung
+		receiveControlPacket ();
 }
 
 /// Bereitet Empfang eines Pakets auf Control Endpoint vor.
@@ -427,42 +343,8 @@ void ControlEP::receiveControlPacket () {
 
 /// Aufzurufen vom onSetupStage()-Callback aus. Bereitet das Absenden eines Datenblocks vor.
 void ControlEP::dataInStage (const uint8_t* data, size_t length) {
-	size_t pkLength;
-	size_t bufSize = getTxBufLength ();
-	if (length < bufSize) {
-		// Muss nur 1 Paket absenden
-		m_state = CTRL_STATE::DATA_IN_LAST;
-		m_remaining = 0;
-		m_data = nullptr;
-		pkLength = length;
-	} else if (length == bufSize) {
-		// Muss 1 Paket und ein 0-Paket absenden um Ende zu markieren
-		m_state = CTRL_STATE::DATA_IN;
-		m_remaining = 0;
-		m_data = nullptr;
-		pkLength = length;
-	} else {
-		// Muss mehrere Pakete senden
-		m_state = CTRL_STATE::DATA_IN;
-		m_remaining = length - bufSize;
-		// const_cast ist zwar unsauber aber nicht falsch, denn beim Senden wird auf m_data
-		// nie geschrieben, und so kann m_data sowohl zum Senden als auch zum Empfangen genutzt werden.
-		m_data = const_cast<uint8_t*> (data) + bufSize;
-		pkLength = bufSize;
-	}
-	// Sende Daten
-	transmitPacket (data, pkLength);
-}
-
-/// Aufzurufen vom onSetupStage()-Callback aus. Bereitet das Empfangen eines Datenblocks vor.
-void ControlEP::dataOutStage (uint8_t* data, size_t length) {
-	// Merke Daten
-	m_state = CTRL_STATE::DATA_OUT;
-	m_count = length;
-	m_remaining = length;
-	m_data = data;
-	// Bereite Empfang vor
-	receiveControlPacket ();
+	myassert (length < getTxBufLength ());
+	transmitPacket (data, length);
 }
 
 /**
@@ -472,11 +354,9 @@ void ControlEP::dataOutStage (uint8_t* data, size_t length) {
 void ControlEP::statusStage (bool success) {
 	if (success) {
 		// Sende 0-Paket, warte Absenden ab
-		m_state = CTRL_STATE::STATUS_OUT;
 		transmitPacket (nullptr, 0);
+		m_sendStatus = true;
 	} else {
-		// Gehe direkt zum Beginn des Zustandsautomaten
-		m_state = CTRL_STATE::SETUP;
 		// Sende STALL
 		transmitStall ();
 		// Empfangspuffer erneut bereit machen
@@ -525,7 +405,7 @@ void DefaultControlEP::onSetupStage () {
 			// bekannt ist.
 			uint16_t length = std::min<uint16_t> (m_wLength, d->length);
 
-			// Sende Deskriptor, ggf. in mehreren Paketen
+			// Sende Deskriptor
 			dataInStage (reinterpret_cast<const uint8_t*> (d->data), length);
 		}
 	} else if (m_bmRequestType == 0 && m_bRequest == ST_REQ::SET_ADDRESS) {
@@ -606,9 +486,6 @@ void DefaultControlEP::onSetupStage () {
 		// Unbekannte Anfragen abweisen
 		statusStage (false);
 	}
-}
-
-void DefaultControlEP::onDataOut (size_t) {
 }
 
 void DefaultControlEP::onDataIn () {

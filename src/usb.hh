@@ -42,9 +42,6 @@ enum class CDC_REQ : uint8_t { SEND_ENCAPSULATED_COMMAND = 0, GET_ENCAPSULATED_R
 /// Auflistung der Standard-Features.
 enum class FEATURE : uint8_t { DEVICE_REMOTE_WAKEUP = 1, ENDPOINT_HALT = 0, TEST_MODE = 2 };
 
-/// Zustände des Zustandsautomaten für Control Endpoints (Klasse ControlEP)
-enum class CTRL_STATE : uint8_t { SETUP, DATA_OUT, DATA_IN, DATA_IN_LAST, STATUS_IN, STATUS_OUT };
-
 /// Auflistung der Endpoint-Typen, für den EPBuffer-Konstruktor. Die Werte entsprechen denen des EPnR-Registers
 enum class EP_TYPE : uint8_t { BULK = 0, CONTROL = 1, ISOCHRONOUS = 2, INTERRUPT = 3 };
 
@@ -164,7 +161,7 @@ class EPBuffer {
 class ControlEP : public EPBuffer {
 	public:
 		constexpr ControlEP (uint8_t iBuffer, uint8_t addr, UsbMem* buffer, size_t bufLength)
-			: EPBuffer (iBuffer, addr, EP_TYPE::CONTROL, buffer, bufLength, buffer, bufLength), m_data (nullptr), m_count (0), m_remaining (0), m_state (CTRL_STATE::SETUP) {}
+			: EPBuffer (iBuffer, addr, EP_TYPE::CONTROL, buffer, bufLength, buffer, bufLength), m_sendStatus (false) {}
 
 		// Verbiete Kopieren/Zuweisen
 
@@ -174,7 +171,6 @@ class ControlEP : public EPBuffer {
 		ControlEP& operator = (ControlEP&&) = delete;
 
 		void dataInStage (const uint8_t* data, size_t length);
-		void dataOutStage (uint8_t* data, size_t length);
 		void statusStage (bool success);
 
 	protected:
@@ -183,11 +179,6 @@ class ControlEP : public EPBuffer {
 		 * dataOutStage oder statusStage aufrufen.
 		 */
 		virtual void onSetupStage () = 0;
-		/**
-		 * Wird aufgerufen, wenn in der Data Stage alle Daten vom Host empfangen wurden. "rxBytes"
-		 * gibt die Anzahl der empfangenen Bytes an. Sollte statusStage aufrufen.
-		 */
-		virtual void onDataOut (size_t rxBytes) = 0;
 		/**
 		 * Wird aufgerufen, wenn in der Data Stage alle Daten an den Host gesendet wurden.
 		 * Da bei "In" transfers kein Erfolg signalisiert wird, sollte hier
@@ -206,14 +197,8 @@ class ControlEP : public EPBuffer {
 		virtual void onTransmit () override final;
 	private:
 		void receiveControlPacket ();
-		/// Datenpuffer für zu sendende/empfangende Daten.
-		uint8_t* m_data;
-		/// Gesamtzahl zu übertragender Bytes
-		size_t m_count;
-		/// Verbleibende Anzahl zu übertragender Bytes
-		size_t m_remaining;
-		/// Aktueller Zustand des Zustandsautomaten
-		CTRL_STATE m_state;
+
+		bool m_sendStatus;
 };
 
 /**
@@ -236,7 +221,6 @@ class DefaultControlEP : public ControlEP {
 	protected:
 		virtual void onReset () override final;
 		virtual void onSetupStage () override final;
-		virtual void onDataOut (size_t rxBytes) override final;
 		virtual void onDataIn () override final;
 		virtual void onStatusStage (bool in) override final;
 	private:
