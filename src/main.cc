@@ -25,6 +25,7 @@
 #include "clockconf.h"
 #include "usb.hh"
 #include "main.hh"
+#include "vcp.hh"
 
 extern USBPhys usbPhys;
 
@@ -37,47 +38,91 @@ extern USBPhys usbPhys;
  * Puffer für Endpoint 0. Control Endpoints dürfen nur 8,16,32 oder 64 Bytes pro Paket übertragen.
  * Wird zum Senden & Empfangen genutzt ("half-duplex")
  */
-alignas(4) static UsbAlloc<64> EP0_BUF	USB_MEM;
+alignas(4) static UsbAlloc<64>	EP0_BUF	USB_MEM;
 
-alignas(4) static UsbAlloc<dataEpMaxPacketSize> EP1_BUF	USB_MEM;
+/// Puffer für 3x VCP-Daten. Die per dataEpMaxPacketSize gesetzte Größe wird auch für die Deskriptoren genutzt.
+alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_RX_BUF [3]	USB_MEM;
+alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_TX_BUF [3]	USB_MEM;
+
+/*
+ * Pinbelegung der drei USARTS. In den Klammern stehen die Zuordnungen für das Olimexino-STM32:
+ * VCP0: TX=PA9(D7), RX=PA10(D8), DTR=PA1(D3), RTS=PA5(D13)
+ * VCP1: TX=PA2(D1), RX=PA3(D0), DTR=PA6(D12), RTS=PA7(D11)
+ * VCP2: TX=PB10(D29), RX=PB11(D30), DTR=PC0(D15), RTS=PC1(D16)
+ *
+ * PC12 schaltet (per low) den 1.5kOhm Widerstand ein.
+ */
+
+/// Anlegen der drei Verwaltungsobjekte für die drei VCPs.
+VCP vcp [3] = {
+	{ 0, VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, VCP_RX_BUF [0].size, VCP_TX_BUF [0].size, 4, 3, 1, 2, { 0, 9 }, { 0, 1 }, { 0, 5 } },
+	{ 1, VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, VCP_RX_BUF [1].size, VCP_TX_BUF [1].size, 5, 6, 3, 4, { 0, 2 }, { 0, 6 }, { 0, 7 } },
+	{ 2, VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, VCP_RX_BUF [2].size, VCP_TX_BUF [2].size, 2, 1, 5, 6, { 1, 10 }, { 2, 0 }, { 2, 1 } }
+};
 
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.
 static DefaultControlEP controlEP (usbPhys, 0, EP0_BUF.data, EP0_BUF.size);
 
-/// Lege Endpoint zum Umdrehen der Daten an
-MirrorEP mirrorEP (EP1_BUF.data, EP1_BUF.size);
-
-/// Zentrale Instanz für USB-Zugriff. Übergebe 2 Endpoints.
-USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP, &mirrorEP, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }});
+/// Zentrale Instanz für USB-Zugriff. Übergebe  alle 7 Endpoints.
+USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP,
+											vcp [0].getMgmtEP (), vcp [0].getDataEP (),
+											vcp [1].getMgmtEP (), vcp [1].getDataEP (),
+											vcp [2].getMgmtEP (), vcp [2].getDataEP (),
+											nullptr }});
 
 void initializePeriphalClocks () {
-	// Aktiviere GPIO-Module für die genutzten Pins
-	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
+	// Aktiviere GPIO-Module für die genutzten Pins und USARTs
+	RCC->APB1ENR |= RCC_APB1ENR_USART2EN | RCC_APB1ENR_USART3EN;
+	RCC->APB2ENR |= RCC_APB2ENR_USART1EN | RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
+
+	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
 }
 
-void MirrorEP::onReset () {
-	EPBuffer::onReset ();
-	// Bereite Datenempfang vor
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
+/*
+ * Definitionen der Interrupts. Die Aufrufe werden an die entsprechenden Klassen weitergeleitet. In der "isr"-Funktion
+ * kann der Aufruf mit Timing-Messungen umgeben werden.
+ */
+
+// VCP 0
+
+extern "C" void DMA1_Channel4_IRQHandler () {
+	vcp [0].onDMA_TX_Finish ();
 }
 
-void MirrorEP::onReceive (bool, size_t rxBytes) {
-	// Frage empfangene Daten ab
-	size_t count = std::min<size_t> (sizeof (m_buffer), rxBytes);
-	getReceivedData (m_buffer, count);
-
-	// Drehe jedes Byte um
-	for (size_t i = 0; i < count; ++i) {
-		m_buffer [i] = static_cast<uint8_t> (__RBIT(m_buffer [i]) >> 24);
-	}
-
-	// Sende Ergebnis zurück
-	transmitPacket (m_buffer, count);
+extern "C" void DMA1_Channel5_IRQHandler () {
+	vcp [0].onDMA_RX_Finish ();
 }
 
-void MirrorEP::onTransmit () {
-	// Nach erfolgreichem Senden, mache erneut bereit zum Empfangen
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
+extern "C" void USART1_IRQHandler () {
+	vcp [0].onUSART_IRQ ();
+}
+
+// VCP 1
+
+extern "C" void DMA1_Channel6_IRQHandler () {
+	vcp [1].onDMA_RX_Finish ();
+}
+
+extern "C" void DMA1_Channel7_IRQHandler () {
+	vcp [1].onDMA_TX_Finish ();
+}
+
+extern "C" void USART2_IRQHandler () {
+	vcp [1].onUSART_IRQ ();
+}
+
+// VCP 2
+
+extern "C" void DMA1_Channel3_IRQHandler () {
+	vcp [2].onDMA_RX_Finish ();
+}
+
+extern "C" void DMA1_Channel2_IRQHandler () {
+	vcp [2].onDMA_TX_Finish ();
+}
+
+extern "C" void USART3_IRQHandler () {
+	vcp [2].onUSART_IRQ ();
 }
 
 /**
@@ -97,8 +142,8 @@ int main () {
 	// Peripherie-Takte aktivieren
 	initializePeriphalClocks ();
 
-	LED1.configureOutput ();
-	LED2.configureOutput ();
+	// Alle VCPs initialisieren
+	for (VCP& p : vcp) p.init ();
 
 	// USB-Peripherie aktivieren
 	usbPhys.init ();

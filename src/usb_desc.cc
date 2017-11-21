@@ -29,12 +29,94 @@
 #include "usb_desc.hh"
 #include "main.hh"
 
+/**
+ * Um die Deskriptoren der drei VCPs nicht einzeln angeben zu müssen wird hier eine Funktion definiert,
+ * die für einen VCP die nötigen Deskriptoren generiert, welche dann nach dem Configuration Descriptor
+ * eingefügt werden. iInterface gibt den Index des Management-Interface an (für Notifications), das Daten
+ * Interface wird dann als iInterface+1 angenommen. iMgmtEP und iDataEP geben die Adressen der jeweiligen
+ * Endpoints an.
+ */
+
+static constexpr std::array<char, 66> vcpDescriptor (uint8_t iInterface, uint8_t iMgmtEP, uint8_t iDataEP) {
+	return Util::concatArrays<char> (
+
+		// Der IAD verbindet die beiden folgenden Interfaces zu einer Funktion eines Composite Device.
+		EncodeDescriptors::IAD::interfaceAssociation (
+			iInterface,		// bFirstInterface
+			2,				// bInterfaceCount
+			0x02,			// bFunctionClass
+			2,				// bFunctionSubClass
+			1,				// bFunctionProtocol
+			4				// iFunction
+		),
+
+		// Bei Composite Devices wird die eigentliche Geräte-Klasse im Interface-Deskriptor angegeben.
+		EncodeDescriptors::USB20::interface (
+			static_cast<uint8_t> (iInterface),	// bInterfaceNumber
+			0,		// bAlternateSetting
+			1,		// bNumEndpoints
+			0x2,	// bInterfaceClass		Communications Interface
+			0x2,	// bInterfaceSubClass	Abstract Control Model
+			0x1,	// bInterfaceProtocol	AT
+			0		// iInterface
+		),
+			// Die CDC Deskriptoren werden genutzt um ein CDC-ACM Gerät zu definieren
+			EncodeDescriptors::CDC::classSpecific (
+				0x10,	// bcdCDC
+				EncodeDescriptors::CDC::unionInterface(
+					static_cast<uint8_t> (iInterface),	// bControlInterface
+					static_cast<uint8_t> (iInterface + 1)	// bSubordinateInterfaces
+				),
+				EncodeDescriptors::CDC::ACM(
+						2		// bmCapabilities	Unterstützung für Set_Line_Coding, Set_Control_Line_State, Get_Line_Coding,
+				),
+				EncodeDescriptors::CDC::callManagement(
+						0,		// bmCapabilities	Kein Call Management
+						static_cast<uint8_t> (iInterface + 1)		// bDataInterface
+				)
+			),
+
+			// Notification endpoint - wird im Beispiel nicht genutzt
+			EncodeDescriptors::USB20::endpoint (
+				0x80 | iMgmtEP,	// bEndpointAddress		IN
+				3,		// bmAttributes			Interrupt
+				8,		// wMaxPacketSize
+				255		// bInterval
+			),
+
+		// Das Daten-Interface überträgt die Nutzdaten für den VCP.
+		EncodeDescriptors::USB20::interface (
+			static_cast<uint8_t> (iInterface+1),		// bInterfaceNumber
+			0,		// bAlternateSetting
+			2,		// bNumEndpoints
+			0xA,	// bInterfaceClass		Data Interface
+			0x0,	// bInterfaceSubClass	Unused
+			0x0,	// bInterfaceProtocol	No class specific protocol
+			0		// iInterface
+		),
+			// Endpoints für eigentliche Nutzdaten
+
+			EncodeDescriptors::USB20::endpoint (
+				iDataEP,	// bEndpointAddress			OUT
+				2,		// bmAttributes				Bulk
+				dataEpMaxPacketSize,		// wMaxPacketSize
+				10		// bInterval
+			),
+			EncodeDescriptors::USB20::endpoint (
+				0x80 | iDataEP,	// bEndpointAddress			IN
+				2,		// bmAttributes				Bulk
+				dataEpMaxPacketSize,		// wMaxPacketSize
+				10		// bInterval
+			)
+	);
+}
+
 // Die hier im Device Deskriptor angegebene Device Class markiert das Gerät als Composite Device.
 static constexpr auto deviceDescriptor = EncodeDescriptors::USB20::device (
 			0x200,		// bcdUSB
-			0xFF,		// bDeviceClass
-			0xFF,		// bDeviceSubClass
-			0xFF,		// bDeviceProtocol
+			0xEF,		// bDeviceClass		Miscellaneous Device Class
+			0x02,		// bDeviceSubClass	Common Cla
+			0x01,		// bDeviceProtocol	Interface Association Descriptor
 			64,			// bMaxPacketSize0
 			0xDEAD,		// idVendor		TODO - anpassen
 			0xBEEF,		// idProduct	TODO - anpassen
@@ -53,38 +135,16 @@ static constexpr auto deviceDescriptor = EncodeDescriptors::USB20::device (
 
 
 static constexpr auto confDescriptor = EncodeDescriptors::USB20::configuration (
-			1,			// bNumInterfaces
+			6,			// bNumInterfaces
 			1,			// bConfigurationValue
 			0,			// iConfiguration
 			0x80,		// bmAttributes
 			250,		// bMaxPower (500mA)
 
-			EncodeDescriptors::USB20::interface (
-				0,		// bInterfaceNumber
-				0,		// bAlternateSetting
-				2,		// bNumEndpoints
-				0xFF,	// bInterfaceClass
-				0xFF,	// bInterfaceSubClass
-				0xFF,	// bInterfaceProtocol
-				0		// iInterface
-			),
-			/*
-			 * wMaxPacketSize darf maximal so groß sein wie die Größe des jeweiligen in usb.cc definierten Puffers.
-			 * bEndpointAddress ist die Adresse des endpoints auf dem Bus; ein Endpoint kann einem beliebigen EPnR
-			 * Register zugewiesen werden. @TODO - hier gewünschte Endpoints konfigurieren.
-			 */
-			EncodeDescriptors::USB20::endpoint (
-				1,		// bEndpointAddress
-				2,		// bmAttributes
-				dataEpMaxPacketSize,		// wMaxPacketSize
-				10		// bInterval
-			),
-			EncodeDescriptors::USB20::endpoint (
-				0x81,	// bEndpointAddress
-				2,		// bmAttributes
-				dataEpMaxPacketSize,		// wMaxPacketSize
-				10		// bInterval
-		)
+			// Füge die Deskriptoren für die VCPs hinzu
+			vcpDescriptor (0, 1, 2),
+			vcpDescriptor (2, 3, 4),
+			vcpDescriptor (4, 5, 6)
 );
 
 /**
@@ -129,9 +189,11 @@ static constexpr Descriptor descriptors [] = { { deviceDescriptor, D_TYPE::DEVIC
 									{ strManufacturer, D_TYPE::STRING, 1 },
 									{ strProduct, D_TYPE::STRING, 2 },
 									{ strSerial, D_TYPE::STRING, 3 },
-									{ strFunction, D_TYPE::STRING, 4 },
-									{ strOsStringDesc, D_TYPE::STRING, 0xEE },
-									{ compatIdDescriptor, D_TYPE::OS_DESCRIPTOR, 0 }
+									{ strFunction, D_TYPE::STRING, 4 }
+
+									// Auskommentiert, damit für den VCP der normale Treiber und nicht WinUSB genutzt wird
+									/* , { strOsStringDesc, D_TYPE::STRING, 0xEE },
+									{ compatIdDescriptor, D_TYPE::OS_DESCRIPTOR, 0 } */
 };
 
 /**

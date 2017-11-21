@@ -225,7 +225,7 @@ class DefaultControlEP : public ControlEP {
 	public:
 		constexpr DefaultControlEP (USBPhys& phys, uint8_t iBuffer, UsbMem* buffer, size_t bufLength)
 			: ControlEP (iBuffer, 0, buffer, bufLength), m_phys (phys), m_wValue (0), m_wIndex (0), m_wLength (0),
-			  m_setAddress (0), m_bmRequestType (0), m_bRequest (0) {}
+			  m_lineCodingData {}, m_setAddress (0), m_bmRequestType (0), m_bRequest (0) {}
 
 		// Verbiete Kopieren/Zuweisen
 
@@ -244,6 +244,9 @@ class DefaultControlEP : public ControlEP {
 		USBPhys& m_phys;
 		/// Wird in onSetupStage mit den Daten aus der Anfrage gefüllt, speichert die Daten für die weiteren Callbacks.
 		uint16_t m_wValue, m_wIndex, m_wLength;
+
+		/// Speichert temporär empfangene Daten für die Einstellungen des Serial-Ports.
+		uint8_t m_lineCodingData [7];
 
 		/**
 		 * Wenn der Host eine Adresse zuweist, wird sie zunächst in dieser Variablen gespeichert. In der

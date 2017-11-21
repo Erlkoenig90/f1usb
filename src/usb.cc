@@ -491,6 +491,15 @@ void DefaultControlEP::onReset () {
 	m_setAddress = 0;
 }
 
+/// Prüft, ob das Interface "index" zu einem VCP gehört und gibt ihn zurück, oder nullptr.
+static VCP* getVCP (uint16_t index) {
+	// Die gültigen Indices sind 0, 2, 4.
+	if (index % 2 == 0 && index < 2 * (sizeof(vcp) / sizeof(vcp[0])))
+		return &vcp [index / 2];
+	else
+		return nullptr;
+}
+
 /// Verarbeite Standard-Anfragen auf dem Default Control Endpoint 0.
 void DefaultControlEP::onSetupStage () {
 	// Frage empfangene Daten ab
@@ -593,22 +602,80 @@ void DefaultControlEP::onSetupStage () {
 			statusStage (false);
 		}
 
-	// Ab hier folgen Geräte/Klassen-spezifische Anfragen
-	} else if (m_bmRequestType == 0xC0 && m_bRequest == 2) {
-		// LED Status abfragen.
-		uint8_t data = static_cast<uint8_t> (LED1.getOutput () | (uint8_t { LED2.getOutput () } << 1));
-		dataInStage (&data, 1);
-	} else if (m_bmRequestType == 0x40 && m_bRequest == 1) {
-		LED1.set (m_wValue & 1);
-		LED2.set (m_wValue & 2);
-		statusStage (true);
+	// Ab hier folgen USB-CDC-spezifische Anfragen
+
+	} else if (m_bmRequestType == 0x21 && m_bRequest == CDC_REQ::SEND_ENCAPSULATED_COMMAND) {
+		// Spezielle Modem-Befehle werden nicht unterstützt.
+		statusStage (false);
+	} else if (m_bmRequestType == 0xA1 && m_bRequest == CDC_REQ::GET_ENCAPSULATED_RESPONSE) {
+		// Spezielle Modem-Befehle werden nicht unterstützt.
+		statusStage (false);
+	} else if (m_bmRequestType == 0x21 && m_bRequest == CDC_REQ::SET_LINE_CODING) {
+		if (m_wValue == 0 && getVCP (m_wIndex) && m_wLength == 7) {
+			// Setzen der Serial-Parameter auf einem gültigen VCP
+			// Empfange die Parameter via Data Stage.
+			dataOutStage (m_lineCodingData, 7);
+		} else {
+			statusStage (false);
+		}
+	} else if (m_bmRequestType == 0xA1 && m_bRequest == CDC_REQ::GET_LINE_CODING) {
+		if (m_wValue == 0 && getVCP (m_wIndex)) {
+			// Abfrage der Serial-Parameter
+
+			// Frage Einstellungen ab
+			const LineCoding& lineCoding = getVCP (m_wIndex)->getLineCoding ();
+
+			// Kodiere Einstellungen in Rohdaten
+			m_lineCodingData [0] = static_cast<uint8_t> (lineCoding.dwDTERate & 0xFF);
+			m_lineCodingData [1] = static_cast<uint8_t> ((lineCoding.dwDTERate >> 8) & 0xFF);
+			m_lineCodingData [2] = static_cast<uint8_t> ((lineCoding.dwDTERate >> 16) & 0xFF);
+			m_lineCodingData [3] = static_cast<uint8_t> ((lineCoding.dwDTERate >> 24) & 0xFF);
+			m_lineCodingData [4] = lineCoding.bCharFormat;
+			m_lineCodingData [5] = lineCoding.bParityType;
+			m_lineCodingData [6] = lineCoding.bDataBits;
+
+			// Sende via Data Stage ab
+			dataInStage (m_lineCodingData, 7);
+		} else {
+			statusStage (false);
+		}
+	} else if (m_bmRequestType == 0x21 && m_bRequest == CDC_REQ::SET_CONTROL_LINE_STATE) {
+		if (getVCP (m_wIndex) && m_wLength == 0) {
+			// Setzen der DTR/RTS Leitungen
+			// Leite an VCP Klasse weiter
+			getVCP (m_wIndex)->setLineState (m_wValue & 1, m_wValue & 2);
+			statusStage (true);
+		} else {
+			statusStage (false);
+		}
 	} else {
 		// Unbekannte Anfragen abweisen
 		statusStage (false);
 	}
 }
 
-void DefaultControlEP::onDataOut (size_t) {
+void DefaultControlEP::onDataOut (size_t rxBytes) {
+	if (m_bmRequestType == 0x21 && m_bRequest == CDC_REQ::SET_LINE_CODING && rxBytes >= 7 && getVCP (m_wIndex)) {
+		// Es wurden die zum SET_LINE_CODING Kommando gehörigen Daten empfangen.
+
+		// Interpretiere Rohdaten
+		LineCoding lineCoding;
+		lineCoding.dwDTERate =	uint32_t { m_lineCodingData [0] }
+							|	(uint32_t { m_lineCodingData [1] } << 8)
+							|	(uint32_t { m_lineCodingData [2] } << 16)
+							|	(uint32_t { m_lineCodingData [3] } << 24);
+		lineCoding.bCharFormat = m_lineCodingData [4];
+		lineCoding.bParityType = m_lineCodingData [5];
+		lineCoding.bDataBits = m_lineCodingData [6];
+
+		// Übernehme Einstellung
+		if (getVCP (m_wIndex)->setLineCoding (lineCoding)) {
+			getVCP (m_wIndex)->confUSART ();
+			statusStage (true);
+		} else
+			statusStage (false);
+	} else
+		statusStage (false);
 }
 
 void DefaultControlEP::onDataIn () {
