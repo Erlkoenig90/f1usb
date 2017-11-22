@@ -312,6 +312,7 @@ void EPBuffer::onReset () {
 void ControlEP::onReset () {
 	EPBuffer::onReset ();
 
+	m_sendStatus = false;
 	receiveControlPacket ();
 }
 
@@ -344,6 +345,7 @@ void ControlEP::receiveControlPacket () {
 /// Aufzurufen vom onSetupStage()-Callback aus. Bereitet das Absenden eines Datenblocks vor.
 void ControlEP::dataInStage (const uint8_t* data, size_t length) {
 	myassert (length < getTxBufLength ());
+	m_sendStatus = false;
 	transmitPacket (data, length);
 }
 
