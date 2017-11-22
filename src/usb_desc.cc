@@ -37,8 +37,8 @@
  * Endpoints an.
  */
 
-static constexpr std::array<char, 66> vcpDescriptor (uint8_t iInterface, uint8_t iMgmtEP, uint8_t iDataEP) {
-	return Util::concatArrays<char> (
+static constexpr std::array<Util::EncChar, 66> vcpDescriptor (uint8_t iInterface, uint8_t iMgmtEP, uint8_t iDataEP) {
+	return Util::concatArrays<Util::EncChar> (
 
 		// Der IAD verbindet die beiden folgenden Interfaces zu einer Funktion eines Composite Device.
 		EncodeDescriptors::IAD::interfaceAssociation (
@@ -158,7 +158,7 @@ static constexpr auto compatIdDescriptor = EncodeDescriptors::MS_OS_Desc::compat
 			EncodeDescriptors::MS_OS_Desc::compatIdFunction (
 				0,									// bFirstInterfaceNumber
 				Util::encodeString ("WINUSB\0\0"),	// compatibleID
-				std::array<char, 8> {}				// subCompatibleID
+				std::array<Util::EncChar, 8> {}				// subCompatibleID
 			)
 );
 

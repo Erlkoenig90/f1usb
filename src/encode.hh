@@ -21,10 +21,10 @@
 
 /*
  * In dieser Datei werden Hilfsfunktionen definiert, die von den Funktionen aus usb_desc_helper.hh aufgerufen werden.
- * Diese ermöglichen es, Integer-Daten in std::array<char,...>-Instanzen zu kodieren, und beliebig viele std::array
- * -Instanzen zu konkatenieren, woraus letztlich die Deskriptoren aufgebaut werden. Diese gesamte Verarbeitung geschieht
- * "constexpr", d.h. vom Compiler, sodass das Ergebnis als Konstante im Flash abgelegt werden kann.
- * Werden die Funktionen aus usb_desc_helper.hh nicht genutzt, kann diese Datei gelöscht werden.
+ * Diese ermöglichen es, Integer-Daten in std::array<EncChar,...>-Instanzen zu kodieren, und beliebig viele std::array
+ * -Instanzen zu konkatenieren, woraus letztlich die Deskriptoren aufgebaut werden. EncChar ist dabei ein Alias für uint8_t.
+ * Diese gesamte Verarbeitung geschieht "constexpr", d.h. vom Compiler, sodass das Ergebnis als Konstante im Flash
+ * abgelegt werden kann. Werden die Funktionen aus usb_desc_helper.hh nicht genutzt, kann diese Datei gelöscht werden.
  */
 
 #ifndef ENCODE_HH_
@@ -137,6 +137,8 @@ namespace Util {
 		};
 	}
 
+	using EncChar = uint8_t;
+
 	/**
 	 * Konkateniert die per Parameter angegebene Folge von Arrays zu einem Array. In "T" muss der Element-Typ angegeben werden.
 	 * Es wird ein 4x-Fold angewendet, um immer jeweils 4 Arrays auf einmal zu konkatenieren.
@@ -148,88 +150,88 @@ namespace Util {
 
 	namespace Helper {
 		template <typename T, size_t... I>
-		usb_always_inline constexpr std::array<char, sizeof(T)> encodeUInt (T&& val, std::index_sequence<I...>) {
-			return {{ static_cast<char> ((val >> (8 * I)) & 0xFF) ... }};
+		usb_always_inline constexpr std::array<EncChar, sizeof(T)> encodeUInt (T&& val, std::index_sequence<I...>) {
+			return {{ static_cast<EncChar> ((val >> (8 * I)) & 0xFF) ... }};
 		}
 
 		template <typename T, size_t N, size_t... I>
-		usb_always_inline constexpr std::array<char, sizeof...(I)> encodeString (const T (&string) [N], std::index_sequence<I...>) {
-			return {{ static_cast<char> (static_cast<std::make_unsigned_t<T>> ( string [I/sizeof(T)] ) >> ((I%sizeof(T))*8))... }};
+		usb_always_inline constexpr std::array<EncChar, sizeof...(I)> encodeString (const T (&string) [N], std::index_sequence<I...>) {
+			return {{ static_cast<EncChar> (static_cast<std::make_unsigned_t<T>> ( string [I/sizeof(T)] ) >> ((I%sizeof(T))*8))... }};
 		}
 	}
 
-	/// Kodiert einen vorzeichenlosen Integer in ein std::array<char,...>.
+	/// Kodiert einen vorzeichenlosen Integer in ein std::array<EncChar,...>.
 	template <typename T>
-	usb_always_inline constexpr std::enable_if_t<std::is_unsigned<Plain<T>>::value, std::array<char, sizeof(T)>> encode (T&& val) {
+	usb_always_inline constexpr std::enable_if_t<std::is_unsigned<Plain<T>>::value, std::array<EncChar, sizeof(T)>> encode (T&& val) {
 		return Helper::encodeUInt (std::forward<T> (val), std::make_index_sequence<sizeof(T)> {});
 	}
-	/// Kodiert einen vorzeichenbehafteten Integer in ein std::array<char,...>.
+	/// Kodiert einen vorzeichenbehafteten Integer in ein std::array<EncChar,...>.
 	template <typename T>
-	usb_always_inline constexpr std::enable_if_t<std::is_signed<Plain<T>>::value, std::array<char, sizeof(T)>> encode (T&& val) {
+	usb_always_inline constexpr std::enable_if_t<std::is_signed<Plain<T>>::value, std::array<EncChar, sizeof(T)>> encode (T&& val) {
 		return Helper::encodeUInt (static_cast<std::make_unsigned_t<Plain<T>>> (val), std::make_index_sequence<sizeof(T)> {});
 	}
-	/// Kodiert einen enum-Wert in ein std::array<char,...>, in dem der zugrundeliegende Typ genutzt wird.
+	/// Kodiert einen enum-Wert in ein std::array<EncChar,...>, in dem der zugrundeliegende Typ genutzt wird.
 	template <typename T>
 	usb_always_inline constexpr decltype(encode(std::declval<std::underlying_type_t<std::enable_if_t<std::is_enum<Plain<T>>::value, Plain<T>>>>())) encode (T&& val) {
 		return encode (static_cast<std::underlying_type_t<Plain<T>>> (std::forward<T> (val)));
 	}
 
 	/**
-	 * Wandelt ein String-Literal (char, charXX_t) in ein std::array<char,...> um, wobei das terminierende 0-Zeichen
+	 * Wandelt ein String-Literal (char, charXX_t) in ein std::array<EncChar,...> um, wobei das terminierende 0-Zeichen
 	 * abgeschnitten wird. char16_t/char32_t -Strings (typ. UTF-16/32) werden als little endian kodiert.
 	 */
 	template <typename T, size_t N>
-	usb_always_inline constexpr std::array<char, sizeof(T)*(N-1)> encodeString (const T (&string) [N]) {
+	usb_always_inline constexpr std::array<EncChar, sizeof(T)*(N-1)> encodeString (const T (&string) [N]) {
 		return Helper::encodeString (string, std::make_index_sequence<sizeof(T)*(N-1)> {});
 	}
 
 	namespace Helper {
 		template <typename T, size_t N, typename ArrT, size_t... I>
-		usb_always_inline constexpr std::array<char, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encodeArray (ArrT&& arr, std::index_sequence<I...>) {
-			return concatArrays<char> (encode (std::forward<ArrT> (arr) [I])...);
+		usb_always_inline constexpr std::array<EncChar, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encodeArray (ArrT&& arr, std::index_sequence<I...>) {
+			return concatArrays<EncChar> (encode (std::forward<ArrT> (arr) [I])...);
 		}
 	}
 	/**
-	 * Wandelt ein Array beliebigen Typs in ein std::array<char,...> um, wobei die Elemente einzeln per entsprechender
+	 * Wandelt ein Array beliebigen Typs in ein std::array<EncChar,...> um, wobei die Elemente einzeln per entsprechender
 	 * encode()-Funktion umgewandelt werden.
 	 */
 	template <typename T, size_t N>
-	usb_always_inline constexpr std::array<char, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (std::array<T, N>&& arr) {
+	usb_always_inline constexpr std::array<EncChar, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (std::array<T, N>&& arr) {
 		return Helper::encodeArray<T, N> (std::move (arr), std::make_index_sequence<N> {});
 	}
 	/**
-	 * Wandelt ein Array beliebigen Typs in ein std::array<char,...> um, wobei die Elemente einzeln per entsprechender
+	 * Wandelt ein Array beliebigen Typs in ein std::array<EncChar,...> um, wobei die Elemente einzeln per entsprechender
 	 * encode()-Funktion umgewandelt werden.
 	 */
 	template <typename T, size_t N>
-	usb_always_inline constexpr std::array<char, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (const std::array<T, N>& arr) {
+	usb_always_inline constexpr std::array<EncChar, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (const std::array<T, N>& arr) {
 		return Helper::encodeArray<T, N> (arr, std::make_index_sequence<N> {});
 	}
 	/**
-	 * Wandelt ein Array beliebigen Typs in ein std::array<char,...> um, wobei die Elemente einzeln per entsprechender
+	 * Wandelt ein Array beliebigen Typs in ein std::array<EncChar,...> um, wobei die Elemente einzeln per entsprechender
 	 * encode()-Funktion umgewandelt werden.
 	 */
 	template <typename T, size_t N>
-	usb_always_inline constexpr std::array<char, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (T (&&arr) [N]) {
+	usb_always_inline constexpr std::array<EncChar, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (T (&&arr) [N]) {
 		return Helper::encodeArray<T, N> (std::move (arr), std::make_index_sequence<N> {});
 	}
 	/**
-	 * Wandelt ein Array beliebigen Typs in ein std::array<char,...> um, wobei die Elemente einzeln per entsprechender
+	 * Wandelt ein Array beliebigen Typs in ein std::array<EncChar,...> um, wobei die Elemente einzeln per entsprechender
 	 * encode()-Funktion umgewandelt werden.
 	 */
 	template <typename T, size_t N>
-	usb_always_inline constexpr std::array<char, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (const T (&arr) [N]) {
+	usb_always_inline constexpr std::array<EncChar, N * arrSize<decltype(encode (std::declval<T> ()))> ()> encode (const T (&arr) [N]) {
 		return Helper::encodeArray<T, N> (arr, std::make_index_sequence<N> {});
 	}
 	/// Gibt den Parameter direkt zurück.
-	template <size_t N> usb_always_inline constexpr std::array<char, N> encode (std::array<char, N>&& arr) { return arr;	}
+	template <size_t N> usb_always_inline constexpr std::array<EncChar, N> encode (std::array<EncChar, N>&& arr) { return arr;	}
 	/// Gibt den Parameter direkt zurück.
-	template <size_t N> usb_always_inline constexpr std::array<char, N> encode (const std::array<char, N>& arr) { return arr; }
+	template <size_t N> usb_always_inline constexpr std::array<EncChar, N> encode (const std::array<EncChar, N>& arr) { return arr; }
 
 	/// Kodiert die einzelnen Parameter per entsprechender encode()-Funktion, und gibt die konkatenierten Ergebnisse zurück.
 	template <typename... T>
-	usb_always_inline constexpr std::array<char, (arrSize<decltype(encode (std::declval<T> ()))> () + ...)> encodeMulti (T&&... args) {
-		return concatArrays<char> (encode (args)...);
+	usb_always_inline constexpr std::array<EncChar, (arrSize<decltype(encode (std::declval<T> ()))> () + ...)> encodeMulti (T&&... args) {
+		return concatArrays<EncChar> (encode (args)...);
 	}
 }
 
