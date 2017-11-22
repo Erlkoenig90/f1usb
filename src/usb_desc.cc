@@ -98,7 +98,7 @@ static constexpr auto compatIdDescriptor = EncodeDescriptors::MS_OS_Desc::compat
 			EncodeDescriptors::MS_OS_Desc::compatIdFunction (
 				0,									// bFirstInterfaceNumber
 				Util::encodeString ("WINUSB\0\0"),	// compatibleID
-				std::array<char, 8> {}				// subCompatibleID
+				std::array<Util::EncChar, 8> {}				// subCompatibleID
 			)
 );
 

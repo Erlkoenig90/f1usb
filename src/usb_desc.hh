@@ -33,9 +33,9 @@
  */
 struct Descriptor {
 	template <size_t N>
-	constexpr Descriptor (const std::array<char, N>& data_, D_TYPE type_, uint8_t index_) : data (& data_[0]), length (N), type (type_), index (index_) {}
+	constexpr Descriptor (const std::array<Util::EncChar, N>& data_, D_TYPE type_, uint8_t index_) : data (& data_[0]), length (N), type (type_), index (index_) {}
 
-	const char* data;
+	const Util::EncChar* data;
 	uint8_t length;
 	D_TYPE type;
 	uint8_t index;

@@ -526,7 +526,7 @@ void DefaultControlEP::onSetupStage () {
 			uint16_t length = std::min<uint16_t> (m_wLength, d->length);
 
 			// Sende Deskriptor, ggf. in mehreren Paketen
-			dataInStage (reinterpret_cast<const uint8_t*> (d->data), length);
+			dataInStage (d->data, length);
 		}
 	} else if (m_bmRequestType == 0 && m_bRequest == ST_REQ::SET_ADDRESS) {
 		// Zuweisung einer USB-Adresse.
