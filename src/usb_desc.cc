@@ -44,6 +44,7 @@ static constexpr auto deviceDescriptor = EncodeDescriptors::USB20::device (
 			3,			// iSerialNumber, entspricht dem Index des strSerial-Deskriptors
 			1			// bNumConfigurations
 		);
+// static constexpr std::array<unsigned char, 18> deviceDescriptor {{ 0x12, 0x01, 0x00, 0x02, 0xff, 0xff, 0xff, 0x40, 0xad, 0xde, 0xef, 0xbe, 0x00, 0x01, 0x01, 0x02, 0x03, 0x01 }};
 
 /*
  * Bei Endpoints darf wMaxPacketSize maximal so groß sein wie die Größe des jeweiligen in usb.cc definierten Puffers.
@@ -86,6 +87,7 @@ static constexpr auto confDescriptor = EncodeDescriptors::USB20::configuration (
 				10		// bInterval
 		)
 );
+// static constexpr std::array<unsigned char, 32> confDescriptor {{ 0x09, 0x02, 0x20, 0x00, 0x01, 0x01, 0x00, 0x80, 0xfa, 0x09, 0x04, 0x00, 0x00, 0x02, 0xff, 0xff, 0xff, 0x00, 0x07, 0x05, 0x01, 0x02, 0x40, 0x00, 0x0a, 0x07, 0x05, 0x81, 0x02, 0x40, 0x00, 0x0a }};
 
 /**
  * Dieser Microsoft Compat Id Deskriptor identifiziert das Gerät als "WinUsb Device", s.d. automatisch der
@@ -101,24 +103,32 @@ static constexpr auto compatIdDescriptor = EncodeDescriptors::MS_OS_Desc::compat
 				std::array<Util::EncChar, 8> {}				// subCompatibleID
 			)
 );
+// static constexpr std::array<unsigned char, 40> compatIdDescriptor {{ 0x28, 0x00, 0x00, 0x00, 0x00, 0x01, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x57, 0x49, 0x4e, 0x55, 0x53, 0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }};
 
 // Diese Strings identifizieren das Gerät für den Benutzer. Sie müssen als UTF-16 kodiert werden (kleines u)
 
 static constexpr auto strManufacturer = EncodeDescriptors::USB20::string (u"ACME Corp.");
-static constexpr auto strProduct = EncodeDescriptors::USB20::string (u"Fluxkompensator");
-static constexpr auto strSerial = EncodeDescriptors::USB20::string (u"42-1337-47/11");
-static constexpr auto strFunction = EncodeDescriptors::USB20::string (u"STM32 Serial Port");
+//static  constexpr std::array<unsigned char, 22> strManufacturer {{ 0x16, 0x03, 0x41, 0x00, 0x43, 0x00, 0x4d, 0x00, 0x45, 0x00, 0x20, 0x00, 0x43, 0x00, 0x6f, 0x00, 0x72, 0x00, 0x70, 0x00, 0x2e, 0x00 }};
 
+static constexpr auto strProduct = EncodeDescriptors::USB20::string (u"Fluxkompensator");
+//static constexpr std::array<unsigned char, 32> strProduct {{ 0x20, 0x03, 0x46, 0x00, 0x6c, 0x00, 0x75, 0x00, 0x78, 0x00, 0x6b, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x70, 0x00, 0x65, 0x00, 0x6e, 0x00, 0x73, 0x00, 0x61, 0x00, 0x74, 0x00, 0x6f, 0x00, 0x72, 0x00 }};
+
+static constexpr auto strSerial = EncodeDescriptors::USB20::string (u"42-1337-47/11");
+//static constexpr std::array<unsigned char, 28> strSerial {{ 0x1c, 0x03, 0x34, 0x00, 0x32, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x33, 0x00, 0x33, 0x00, 0x37, 0x00, 0x2d, 0x00, 0x34, 0x00, 0x37, 0x00, 0x2f, 0x00, 0x31, 0x00, 0x31, 0x00 }};
+
+static constexpr auto strFunction = EncodeDescriptors::USB20::string (u"STM32 Serial Port");
+//static constexpr std::array<unsigned char, 36> strFunction {{ 0x24, 0x03, 0x53, 0x00, 0x54, 0x00, 0x4d, 0x00, 0x33, 0x00, 0x32, 0x00, 0x20, 0x00, 0x53, 0x00, 0x65, 0x00, 0x72, 0x00, 0x69, 0x00, 0x61, 0x00, 0x6c, 0x00, 0x20, 0x00, 0x50, 0x00, 0x6f, 0x00, 0x72, 0x00, 0x74, 0x00 }};
 /**
  * Der Microsoft OS String Deskriptor ist erforderlich, damit der Compat Id Deskriptor überhaupt abgefragt wird.
  * Er muss den Index 0xEE haben. Das Byte mit Wert 3 ist beliebig, und wird vom PC für bRequest genutzt um
  * den compatIdDescriptor abzufragen. Da 1 und 2 schon zur LED-Steuerung belegt sind, wird hier 3 verwendet.
  */
 static constexpr auto strOsStringDesc = EncodeDescriptors::USB20::string(u"MSFT100\u0003");
+//static constexpr std::array<unsigned char, 18> strOsStringDesc {{ 0x12, 0x03, 0x4d, 0x00, 0x53, 0x00, 0x46, 0x00, 0x54, 0x00, 0x31, 0x00, 0x30, 0x00, 0x30, 0x00, 0x03, 0x00 }};
 
 /// Da die Strings Deutsch sind, wird hier nur Deutsch als Sprache angegeben.
 static constexpr auto langTable = EncodeDescriptors::USB20::languageTable (0x0407 /* German (Standard) */);
-
+//static constexpr std::array<unsigned char, 4> langTable {{ 0x04, 0x03, 0x07, 0x04 }};
 /**
  * Alle oben angegebenen Deskriptoren müssen in dieser Tabelle eingetragen werden, damit sie zur Laufzeit
  * gefunden werden können. Die Länge des Deskriptors wird im Konstruktor von "Descriptor" inferiert.
@@ -129,7 +139,7 @@ static constexpr Descriptor descriptors [] = { { deviceDescriptor, D_TYPE::DEVIC
 									{ strManufacturer, D_TYPE::STRING, 1 },
 									{ strProduct, D_TYPE::STRING, 2 },
 									{ strSerial, D_TYPE::STRING, 3 },
-									{ strFunction, D_TYPE::STRING, 4 },
+	//								{ strFunction, D_TYPE::STRING, 4 },
 									{ strOsStringDesc, D_TYPE::STRING, 0xEE },
 									{ compatIdDescriptor, D_TYPE::OS_DESCRIPTOR, 0 }
 };
