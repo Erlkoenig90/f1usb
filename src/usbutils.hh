@@ -68,9 +68,6 @@ class UsbMem {
 // Die einzelnen Instanzen von UsbMem müssen 4 Bytes groß sein sodass sie im Array an Adressen liegen die Vielfache von 4 sind.
 static_assert (sizeof(UsbMem) == 4, "");
 
-// Die einzelnen Instanzen von UsbMem müssen 4 Bytes groß sein sodass sie im Array an Adressen liegen die Vielfache von 4 sind.
-static_assert (sizeof(UsbMem) == 4, "");
-
 /**
  * Enthält ein Array namens "data" aus UsbMem, wobei N/2 als Größe angenommen wird. Kann genutzt werden,
  * um Pufferspeicher im USB-RAM für Endpoints zu definieren, indem Bytes statt 16bit-Wörtern als Größe angegeben werden können.
