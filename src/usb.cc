@@ -551,7 +551,7 @@ void DefaultControlEP::onSetupStage () {
 
 		uint8_t conf = static_cast<uint8_t> (m_wValue & 0xFF);
 		if (conf == 0) {
-			// Wird Konfiguration 0 gesetzt, soll sich das Gerät reinitialisieren, als hätte es noch keine Adresse bekommen.
+			// Wird Konfiguration 0 gesetzt, soll sich das Gerät reinitialisieren, als hätte es soeben eine initiale Adresse bekommen.
 			// In diesem einfachen Beispiel ist nichts zu tun.
 
 			// Sende Bestätigung.
