@@ -60,31 +60,19 @@ class VCP_MgmtEP : public EPBuffer {
 		virtual void onTransmit () override;
 };
 
-/// Wird für den Nutzdaten-EP des VCP genutzt. Leitet die Callbacks an die zugehörige VCP-Instanz weiter.
-class VCP_DataEP : public EPBuffer {
-	public:
-		constexpr VCP_DataEP (VCP& vcp, uint8_t addr, UsbMem* rxBuffer, size_t rxBufLength, UsbMem* txBuffer, size_t txBufLength)
-			: EPBuffer (addr, addr, EP_TYPE::BULK, rxBuffer, rxBufLength, txBuffer, txBufLength), m_VCP (vcp) {}
-
-		virtual void onReset () override;
-		virtual void onReceive (bool setup, size_t rxBytes) override;
-		virtual void onTransmit () override;
-	private:
-		VCP& m_VCP;
-};
-
 /**
  * Die VCP-Klasse verbindet einen USART mit dem USB. An den Konstruktor müssen Nummer des USART, Puffer für die Endpoints,
  * DMA-Channel-Nummern (ab 0 zählend), Endpoint-Nummern und Pins übergeben werden. Die Klasse enthält Callbacks aus ISRs
  * und aus der USB-Peripherie.
  */
-class VCP {
+class VCP : private EPBuffer {
 	public:
 		constexpr VCP (uint8_t iUsart, UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t epBufferRXLength, uint16_t epBufferTXLength,
 						uint8_t iDMA_RX, uint8_t iDMA_TX, uint8_t iMgmtEP, uint8_t iDataEP, Pin pinTX, Pin pinDTR, Pin pinRTS,
 						uint8_t* intBuffer, size_t intBufferSize)
-					: m_usb2uartBuffer (intBuffer, intBufferSize / 2), m_uart2usbBuffer (intBuffer + intBufferSize / 2, intBufferSize / 2),
-					m_lineCoding { 9600, 0, 0, 8 }, m_mgmtEP (iMgmtEP), m_dataEP (*this, iDataEP, epBufferRX, epBufferRXLength, epBufferTX, epBufferTXLength),
+					: EPBuffer (iDataEP, iDataEP, EP_TYPE::BULK, epBufferRX, epBufferRXLength, epBufferTX, epBufferTXLength),
+					m_usb2uartBuffer (intBuffer, intBufferSize / 2), m_uart2usbBuffer (intBuffer + intBufferSize / 2, intBufferSize / 2),
+					m_lineCoding { 9600, 0, 0, 8 }, m_mgmtEP (iMgmtEP),
 					m_pinTX (pinTX), m_pinDTR (pinDTR), m_pinRTS (pinRTS),
 					m_txUSBBytes (0), m_rxUSARTBytes (0), m_txUSARTBytes (0), m_USART_Prescaler (469),
 					m_USART (iUsart), m_iDMA_RX (iDMA_RX), m_iDMA_TX (iDMA_TX),
@@ -98,8 +86,6 @@ class VCP {
 		VCP& operator = (VCP&&) = delete;
 
 		void init ();
-		void onUSB_Receive (size_t rxBytes);
-		void onUSB_Transmit ();
 		void onDMA_RX_Finish ();
 		void onDMA_TX_Finish ();
 		void onUSART_IRQ ();
@@ -113,17 +99,20 @@ class VCP {
 		inline uint8_t getDMA_TX () { return m_iDMA_TX; }
 		void setLineState (bool DTR, bool RTS);
 
-		void reset ();
 
 		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
 		constexpr EPBuffer* getMgmtEP () { return &m_mgmtEP; }
 		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
-		constexpr EPBuffer* getDataEP () { return &m_dataEP; }
+		constexpr EPBuffer* getDataEP () { return this; }
 		/// Fragt die enthaltene EPBuffer-Instanz für den Nutzdaten-Endpoint ab.
 		constexpr const EPBuffer* getMgmtEP () const { return &m_mgmtEP; }
 		/// Fragt die enthaltene EPBuffer-Instanz für den Nutzdaten-Endpoint ab.
-		constexpr const EPBuffer* getDataEP () const { return &m_dataEP; }
+		constexpr const EPBuffer* getDataEP () const { return this; }
 	private:
+		virtual void onReset () override;
+		virtual void onReceive (bool setup, size_t rxBytes) override;
+		virtual void onTransmit () override;
+
 		void setupDMA (uint8_t channel, uint8_t* memBuf, uint16_t length, bool TX);
 		void setupDMA (bool force = false);
 		void clearDMAInt (uint8_t channel);
@@ -139,8 +128,6 @@ class VCP {
 		LineCoding m_lineCoding;
 		/// Der Management-Endpoint.
 		VCP_MgmtEP m_mgmtEP;
-		/// Der Nutzdaten-Endpoint.
-		VCP_DataEP m_dataEP;
 
 		/// Der Sende-Pin des USART (der Empfangs-Pin wird nicht benötigt, weil der nicht konfiguriert werden muss)
 		Pin m_pinTX;

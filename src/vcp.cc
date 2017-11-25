@@ -39,7 +39,9 @@ static inline DMA_Channel_TypeDef* getDMA (uint8_t iChannel) {
 }
 
 /// Indirekt aufgerufen durch USBPhys; setzt alles zurück.
-void VCP::reset () {
+void VCP::onReset () {
+	EPBuffer::onReset ();
+
 	// Setze alle Daten zurück
 
 	m_usb2uartBuffer.reset ();
@@ -248,7 +250,7 @@ void VCP::onDMA_TX_Finish () {
 }
 
 /// Wird via VCP_DataEP::onReceive aufgerufen, wenn per USB Daten für den VCP angekommen sind.
-void VCP::onUSB_Receive (size_t rxBytes) {
+void VCP::onReceive (bool, size_t rxBytes) {
 	size_t wa = m_usb2uartBuffer.writeAvailable ();
 	myassert (rxBytes <= wa);
 
@@ -257,7 +259,7 @@ void VCP::onUSB_Receive (size_t rxBytes) {
 	uint8_t* buf = m_usb2uartBuffer.write ();
 
 	// Hole Daten aus USB-Puffer in Doppelpuffer
-	m_dataEP.getReceivedData (buf, l);
+	getDataEP ()->getReceivedData (buf, l);
 	// Schreibvorgang abschließen
 	m_usb2uartBuffer.writeFinish (l);
 	m_usbReceiving = false;
@@ -270,7 +272,7 @@ void VCP::onUSB_Receive (size_t rxBytes) {
 }
 
 /// Wird via VCP_DataEP::onTransmit aufgerufen, wenn per USB Daten vom VCP gesendet wurden.
-void VCP::onUSB_Transmit () {
+void VCP::onTransmit () {
 	myassert (m_uart2usbBuffer.readAvailable () >= m_txUSBBytes);
 	// Gebe Puffer frei.
 	m_uart2usbBuffer.readFinish (m_txUSBBytes);
@@ -290,8 +292,8 @@ void VCP::prepareUSBreceive () {
 	// sonst sendet der Host zu viele Daten die dann von der Peripherie verweigert würden.
 	if (wa >= dataEpMaxPacketSize) {
 		// Empfange so viel wie möglich.
-		size_t count = static_cast<uint16_t> (std::min<size_t> (wa, m_dataEP.getRxBufLength ()));
-		m_dataEP.receivePacket (count);
+		size_t count = static_cast<uint16_t> (std::min<size_t> (wa, getDataEP ()->getRxBufLength ()));
+		getDataEP ()->receivePacket (count);
 		m_usbReceiving = true;
 	} else
 		m_usbReceiving = false;
@@ -303,10 +305,10 @@ void VCP::prepareUSBtransmit () {
 	// Beim Senden dürfen auch kurze Pakete auftreten.
 	if (ra > 0) {
 		// Sende so viel wie möglich.
-		size_t count = std::min<size_t> (ra, m_dataEP.getTxBufLength ());
+		size_t count = std::min<size_t> (ra, getDataEP ()->getTxBufLength ());
 		m_txUSBBytes = count;
 		m_usbTransmitting = true;
-		m_dataEP.transmitPacket (m_uart2usbBuffer.read (), count);
+		getDataEP ()->transmitPacket (m_uart2usbBuffer.read (), count);
 	} else
 		m_usbTransmitting = false;
 }
@@ -335,19 +337,3 @@ void VCP_MgmtEP::onReceive (bool, size_t) {}
 
 /// Da der Management-EP nicht genutzt wird, passiert hier nichts.
 void VCP_MgmtEP::onTransmit () {}
-
-/// Ruft .reset() im VCP auf, initialisiert ihn neu
-void VCP_DataEP::onReset () {
-	EPBuffer::onReset ();
-	m_VCP.reset ();
-}
-
-/// Ruft onUSB_Receive im VCP auf
-void VCP_DataEP::onReceive (bool, size_t rxBytes) {
-	m_VCP.onUSB_Receive (rxBytes);
-}
-
-/// Ruft onUSB_Transmit im VCP auf
-void VCP_DataEP::onTransmit () {
-	m_VCP.onUSB_Transmit ();
-}
