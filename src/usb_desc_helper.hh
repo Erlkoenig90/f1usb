@@ -104,12 +104,12 @@ namespace EncodeDescriptors {
 		 * beliebig lange Folge an Interface- und Endpointdeskriptoren und solchen die Klassen/Geräte-spezifisch sind folgen.
 		 */
 		template <typename... T>
-		usb_always_inline constexpr std::array<Util::EncChar, 9 + (Util::arrSize<T> ()+...)> configuration (uint8_t bNumInterfaces, uint8_t bConfigurationValue, uint8_t iConfiguration, uint8_t bmAttributes, uint8_t bMaxPower, T&&... sub) {
+		usb_always_inline constexpr std::array<Util::EncChar, Util::staticSum<size_t> (9, Util::arrSize<T> ()...)> configuration (uint8_t bNumInterfaces, uint8_t bConfigurationValue, uint8_t iConfiguration, uint8_t bmAttributes, uint8_t bMaxPower, T&&... sub) {
 			return Util::concatArrays<Util::EncChar> (
 					Util::encodeMulti (
 						uint8_t { 9 },
 						D_TYPE::CONFIGURATION,
-						static_cast<uint16_t> (9 + (Util::arrSize<T> ()+...)),
+						static_cast<uint16_t> (Util::staticSum<size_t> (9, Util::arrSize<T> ()...)),
 						bNumInterfaces,
 						bConfigurationValue,
 						iConfiguration,
@@ -176,10 +176,10 @@ namespace EncodeDescriptors {
 		 * lange Folge an Compat ID Function Deskriptoren folgen, d.h. aus Rückgabewerten von compatIdFunction.
 		 */
 		template <typename... T>
-		usb_always_inline constexpr std::array<Util::EncChar, 16 + (Util::arrSize<T> () + ...)> compatId (uint16_t bcdVersion, uint16_t wIndex, T&&... functions) {
+		usb_always_inline constexpr std::array<Util::EncChar, Util::staticSum<size_t> (16, Util::arrSize<T> ()...)> compatId (uint16_t bcdVersion, uint16_t wIndex, T&&... functions) {
 			return Util::concatArrays<Util::EncChar> (
 					Util::encodeMulti (
-						static_cast<uint32_t> (16 + (Util::arrSize<T> () + ...)),
+						static_cast<uint32_t> (Util::staticSum<size_t> (16, Util::arrSize<T> ()...)),
 						bcdVersion,
 						wIndex,
 						static_cast<uint8_t> (sizeof...(functions))
@@ -211,7 +211,7 @@ namespace EncodeDescriptors {
 		 * übergeben werden kann. Nach dem "bcdCDC"-Parameter kann eine beliebig lange Folge an CDC-Deskriptoren folgen.
 		 */
 		template <typename... T>
-		usb_always_inline constexpr std::array<Util::EncChar, 5 + (Util::arrSize<T> ()+...)> classSpecific (uint16_t bcdCDC, T&&... sub) {
+		usb_always_inline constexpr std::array<Util::EncChar, Util::staticSum<size_t> (5, Util::arrSize<T> ()...)> classSpecific (uint16_t bcdCDC, T&&... sub) {
 			return Util::concatArrays<Util::EncChar> (
 					Util::encodeMulti (
 						uint8_t { 5 },
