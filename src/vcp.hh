@@ -99,15 +99,17 @@ class VCP : private EPBuffer {
 		inline uint8_t getDMA_TX () { return m_iDMA_TX; }
 		void setLineState (bool DTR, bool RTS);
 
-
+#if (__cplusplus >= 201402L)
 		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
 		constexpr EPBuffer* getMgmtEP () { return &m_mgmtEP; }
 		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
 		constexpr EPBuffer* getDataEP () { return this; }
-		/// Fragt die enthaltene EPBuffer-Instanz für den Nutzdaten-Endpoint ab.
-		constexpr const EPBuffer* getMgmtEP () const { return &m_mgmtEP; }
-		/// Fragt die enthaltene EPBuffer-Instanz für den Nutzdaten-Endpoint ab.
-		constexpr const EPBuffer* getDataEP () const { return this; }
+#else
+		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
+		EPBuffer* getMgmtEP () { return &m_mgmtEP; }
+		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
+		EPBuffer* getDataEP () { return this; }
+#endif
 	private:
 		virtual void onReset () override;
 		virtual void onReceive (bool setup, size_t rxBytes) override;
