@@ -1,0 +1,13 @@
+LOAD_FLASH 0x08000000 0x20000 {
+	EXEC_FLASH 0x08000000 {
+		* (RESET, +FIRST)
+		* (+RO)
+	}
+	SRAM 0x20000000 0x5000 {
+		* (+RW)
+		* (+ZI)
+	}
+	USBMEM 0x40006000 UNINIT 1024 {
+		* (.usbbuf)
+	}
+}
