@@ -104,10 +104,8 @@ extern EP_BufDesc BufDescTable [numEP];
  */
 template <typename T>
 usb_always_inline uint16_t mapAddr (T* addr) {
-	// Die Anfangsadresse wird im Linkerscript definiert und hier referenziert.
-	extern char UsbBufBegin;
 	// Ziehe Adresse von Anfangsadresse ab und teile durch 2 um Lücken herauszurechnen.
-	return static_cast<uint16_t> ((reinterpret_cast<uintptr_t> (addr) - reinterpret_cast<uintptr_t> (&UsbBufBegin)) / 2);
+	return static_cast<uint16_t> ((reinterpret_cast<uintptr_t> (addr) - 0x40006000) / 2);
 }
 /**
  * Löscht die in "mask" (als Veroderung der USB_ISTR_xxx -Konstanten) angegeben Interrupts im USB_ISTR-Register.
