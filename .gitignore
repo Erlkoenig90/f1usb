@@ -1,3 +1,19 @@
-Debug
-Debug RAM
-Release
+# Keil Ignores
+/DebugConfig/
+/Listings/
+/Objects/
+*.scvd
+*.uvoptx
+*.uvprojx
+JLinkLog.txt
+JLinkSettings.ini
+*.uvguix.*
+
+# eclipse Ignores
+/Debug/
+/Release/
+/.settings/
+.cproject
+.project
+/launch/
+*.cfg
