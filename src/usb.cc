@@ -543,12 +543,16 @@ void DefaultControlEP::onSetupStage () {
 		uint8_t conf = static_cast<uint8_t> (m_wValue & 0xFF);
 		if (conf == 0) {
 			// Wird Konfiguration 0 gesetzt, soll sich das Gerät reinitialisieren, als hätte es soeben eine initiale Adresse bekommen.
-			// In diesem einfachen Beispiel ist nichts zu tun.
+			// Schalte das Signal für den externen Verbraucher ab.
+			pinEnbPower.set (false);
 
 			// Sende Bestätigung.
 			statusStage (true);
 		} else if (conf == 1) {
 			// Da nur 1 Konfiguration vorhanden, kein tatsächliches Umschalten nötig
+
+			// Aktiviere externen Verbraucher.
+			pinEnbPower.set (true);
 
 			// Bei IN/OUT transfers wird abwechselnd mit DATA0/DATA1 Befehlen übertragen, um Fehler zu erkennen.
 			// Nach dem Setzen einer Konfiguration soll immer mit DATA0 weiter gemacht werden.
@@ -592,16 +596,6 @@ void DefaultControlEP::onSetupStage () {
 			// Nicht unterstützte Operation
 			statusStage (false);
 		}
-
-	// Ab hier folgen Geräte/Klassen-spezifische Anfragen
-	} else if (m_bmRequestType == 0xC0 && m_bRequest == 2) {
-		// LED Status abfragen.
-		uint8_t data = static_cast<uint8_t> (LED1.getOutput () | (uint8_t { LED2.getOutput () } << 1));
-		dataInStage (&data, 1);
-	} else if (m_bmRequestType == 0x40 && m_bRequest == 1) {
-		LED1.set (m_wValue & 1);
-		LED2.set (m_wValue & 2);
-		statusStage (true);
 	} else {
 		// Unbekannte Anfragen abweisen
 		statusStage (false);

@@ -39,45 +39,15 @@ extern USBPhys usbPhys;
  */
 alignas(4) static UsbAlloc<64> EP0_BUF	USB_MEM;
 
-alignas(4) static UsbAlloc<dataEpMaxPacketSize> EP1_BUF	USB_MEM;
-
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.
 static DefaultControlEP controlEP (usbPhys, 0, EP0_BUF.data, EP0_BUF.size);
 
-/// Lege Endpoint zum Umdrehen der Daten an
-MirrorEP mirrorEP (EP1_BUF.data, EP1_BUF.size);
-
 /// Zentrale Instanz für USB-Zugriff. Übergebe 2 Endpoints.
-USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP, &mirrorEP, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }});
+USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }});
 
 void initializePeriphalClocks () {
 	// Aktiviere GPIO-Module für die genutzten Pins
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
-}
-
-void MirrorEP::onReset () {
-	EPBuffer::onReset ();
-	// Bereite Datenempfang vor
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
-}
-
-void MirrorEP::onReceive (bool, size_t rxBytes) {
-	// Frage empfangene Daten ab
-	size_t count = std::min<size_t> (sizeof (m_buffer), rxBytes);
-	getReceivedData (m_buffer, count);
-
-	// Drehe jedes Byte um
-	for (size_t i = 0; i < count; ++i) {
-		m_buffer [i] = static_cast<uint8_t> (__RBIT(m_buffer [i]) >> 24);
-	}
-
-	// Sende Ergebnis zurück
-	transmitPacket (m_buffer, count);
-}
-
-void MirrorEP::onTransmit () {
-	// Nach erfolgreichem Senden, mache erneut bereit zum Empfangen
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
 }
 
 /**
@@ -97,8 +67,8 @@ int main () {
 	// Peripherie-Takte aktivieren
 	initializePeriphalClocks ();
 
-	LED1.configureOutput ();
-	LED2.configureOutput ();
+	pinEnbPower.set(false);
+	pinEnbPower.configureOutput ();
 
 	// USB-Peripherie aktivieren
 	usbPhys.init ();

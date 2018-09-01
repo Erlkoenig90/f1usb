@@ -27,24 +27,8 @@
 #include "util.hh"
 #include "usb.hh"
 
-/**
- * Die maximale Paketgröße für den Endpoint, welcher für die Nutzdaten genutzt wird.
- * Wird in die Deskriptoren eingebaut und zur Reservierung der Puffer benutzt.
- */
-static constexpr uint16_t dataEpMaxPacketSize = 64;
+static constexpr Pin pinEnbPower (0, 5);			// Hier Enable-Pin für externen Verbraucher einstellen
+static constexpr uint8_t usbCurrentRequest = 250;	// Hier gewünschten Strom (in 2mA-Schritten) anpassen
 
-static constexpr Pin LED1 (0, 5), LED2 (0, 1);
-
-/// "Dummy"-Endpoint, welcher ankommende Daten umdreht.
-class MirrorEP : public EPBuffer {
-	public:
-		constexpr MirrorEP (UsbMem* epBuffer, size_t length) : EPBuffer (1, 1, EP_TYPE::BULK, epBuffer, length, epBuffer, length), m_buffer {} {}
-	protected:
-		virtual void onReceive (bool setup, size_t rxBytes);
-		virtual void onTransmit ();
-		virtual void onReset ();
-	private:
-		uint8_t m_buffer [dataEpMaxPacketSize];
-};
 
 #endif /* MAIN_HH_ */

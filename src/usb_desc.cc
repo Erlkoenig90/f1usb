@@ -58,36 +58,19 @@ static constexpr auto confDescriptor = EncodeDescriptors::USB20::configuration (
 			1,			// bConfigurationValue
 			0,			// iConfiguration
 			0x80,		// bmAttributes
-			250,		// bMaxPower (500mA)
+			usbCurrentRequest,		// bMaxPower
 
 			EncodeDescriptors::USB20::interface (
 				0,		// bInterfaceNumber
 				0,		// bAlternateSetting
-				2,		// bNumEndpoints
+				0,		// bNumEndpoints
 				0xFF,	// bInterfaceClass
 				0xFF,	// bInterfaceSubClass
 				0xFF,	// bInterfaceProtocol
 				0		// iInterface
-			),
-			/*
-			 * wMaxPacketSize darf maximal so groß sein wie die Größe des jeweiligen in usb.cc definierten Puffers.
-			 * bEndpointAddress ist die Adresse des endpoints auf dem Bus; ein Endpoint kann einem beliebigen EPnR
-			 * Register zugewiesen werden. @TODO - hier gewünschte Endpoints konfigurieren.
-			 */
-			EncodeDescriptors::USB20::endpoint (
-				1,		// bEndpointAddress
-				2,		// bmAttributes
-				dataEpMaxPacketSize,		// wMaxPacketSize
-				10		// bInterval
-			),
-			EncodeDescriptors::USB20::endpoint (
-				0x81,	// bEndpointAddress
-				2,		// bmAttributes
-				dataEpMaxPacketSize,		// wMaxPacketSize
-				10		// bInterval
-		)
+			)
 );
-// static constexpr std::array<unsigned char, 32> confDescriptor {{ 0x09, 0x02, 0x20, 0x00, 0x01, 0x01, 0x00, 0x80, 0xfa, 0x09, 0x04, 0x00, 0x00, 0x02, 0xff, 0xff, 0xff, 0x00, 0x07, 0x05, 0x01, 0x02, 0x40, 0x00, 0x0a, 0x07, 0x05, 0x81, 0x02, 0x40, 0x00, 0x0a }};
+// static constexpr std::array<unsigned char, 18> confDescriptor {{ 0x09, 0x02, 0x12, 0x00, 0x01, 0x01, 0x00, 0x80, usbCurrentRequest, 0x09, 0x04, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0x00 }};
 
 /**
  * Dieser Microsoft Compat Id Deskriptor identifiziert das Gerät als "WinUsb Device", s.d. automatisch der
