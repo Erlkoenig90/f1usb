@@ -1,8 +1,9 @@
 # f1usb
-Dies ist ein einfaches Beispiel für die Entwicklung eines USB FullSpeed Device auf Basis des STM32F103 ohne die Verwendung externer Bibliotheken, nur durch Low-Level-Registerzugriffe. Es sind drei Varianten gezeigt:
-* Der "master"-Branch zeigt ein (erweiterbares) Beispiel für eigene Requests auf dem Default Control Endpoint zum Setzen und Abfragen von LED's, und einem simplen Loopback auf dem Bulk Endpoint 1. Das Device ist als "WinUSB Device" deklariert und braucht somit ab Windows 8 keine Treiber, es kann bspw. mit [libusb](http://libusb.info) direkt darauf zugegriffen werden. Siehe dazu auch das Projekt [usbclient](https://github.com/Erlkoenig90/usbclient).
-* Im "minimal"-Branch ist eine gekürzte Variante mit gleicher Funktion.
-* Der "vcp"-Branch implementiert einen 3-fachen virtuellen COM-Port ("VCP") (auch als USB-Serial/RS232-Adapter bekannt) auf Basis der Standard-Klasse CDC-ACM, die direkt ohne Treiber genutzt werden kann.
+Dies ist ein einfaches Beispiel für die Entwicklung eines USB FullSpeed Device auf Basis des STM32F103 ohne die Verwendung externer Bibliotheken, nur durch Low-Level-Registerzugriffe. Es sind vier Varianten gezeigt:
+* Der [master-Branch](https://github.com/Erlkoenig90/f1usb/tree/master) zeigt ein (erweiterbares) Beispiel für eigene Requests auf dem Default Control Endpoint zum Setzen und Abfragen von LED's, und einem simplen Loopback auf dem Bulk Endpoint 1. Das Device ist als "WinUSB Device" deklariert und braucht somit ab Windows 8 keine Treiber, es kann bspw. mit [libusb](http://libusb.info) direkt darauf zugegriffen werden. Siehe dazu auch das Projekt [usbclient](https://github.com/Erlkoenig90/usbclient).
+* Im [minimal-Branch](https://github.com/Erlkoenig90/f1usb/tree/minimal) ist eine gekürzte Variante mit gleicher Funktion.
+* Der [vcp-Branch](https://github.com/Erlkoenig90/f1usb/tree/vcp)-Branch implementiert einen 3-fachen virtuellen COM-Port ("VCP") (auch als USB-Serial/RS232-Adapter bekannt) auf Basis der Standard-Klasse CDC-ACM, die direkt ohne Treiber genutzt werden kann.
+* Der [usbpower-Branch](https://github.com/Erlkoenig90/f1usb/tree/usbpower) meldet beim PC einen Stromverbrauch von 500mA an und signalisiert über den Pin PA5, wenn der PC den Strom freigegeben hat (via SET_CONFIGURATION). Hier meldet sich das Gerät ebenfalls als WinUSB Device an. Pin und Strom können im [Code](https://github.com/Erlkoenig90/f1usb/blob/usbpower/src/main.hh) eingestellt werden.
 
 Dies ist der Beispielcode für [dieses Tutorial](https://www.mikrocontroller.net/articles/USB-Tutorial_mit_STM32) zur Entwicklung eigener USB-Geräte.
 
