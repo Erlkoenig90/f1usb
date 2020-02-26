@@ -30,20 +30,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <stm32f1xx.h>
-#include "doublebuffer.hh"
 #include "usb.hh"
-
-/// Speichert per USB angeforderte Konfigurationsdaten für den USART.
-struct LineCoding {
-	/// Baudrate
-	uint32_t dwDTERate;
-	/// Anzahl Stop-Bits
-	uint8_t bCharFormat;
-	/// Prüfbit
-	uint8_t bParityType;
-	// Anzahl Bits pro USART-Frame
-	uint8_t bDataBits;
-};
 
 class VCP;
 
@@ -67,16 +54,12 @@ class VCP_MgmtEP : public EPBuffer {
  */
 class VCP : private EPBuffer {
 	public:
-		constexpr VCP (uint8_t iUsart, UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t epBufferRXLength, uint16_t epBufferTXLength,
-						uint8_t iDMA_RX, uint8_t iDMA_TX, uint8_t iMgmtEP, uint8_t iDataEP, Pin pinTX, Pin pinDTR, Pin pinRTS,
-						uint8_t* intBuffer, size_t intBufferSize)
-					: EPBuffer (iDataEP, iDataEP, EP_TYPE::BULK, epBufferRX, epBufferRXLength, epBufferTX, epBufferTXLength),
-					m_usb2uartBuffer (intBuffer, intBufferSize / 2), m_uart2usbBuffer (intBuffer + intBufferSize / 2, intBufferSize / 2),
-					m_lineCoding { 9600, 0, 0, 8 }, m_mgmtEP (iMgmtEP),
-					m_pinTX (pinTX), m_pinDTR (pinDTR), m_pinRTS (pinRTS),
-					m_txUSBBytes (0), m_rxUSARTBytes (0), m_txUSARTBytes (0), m_USART_Prescaler (469),
-					m_USART (iUsart), m_iDMA_RX (iDMA_RX), m_iDMA_TX (iDMA_TX),
-					m_usbReceiving (false), m_usbTransmitting (false), m_usartReceiving (false), m_usartTransmitting (false) {}
+		constexpr VCP (UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t blockSize, uint8_t* buffer,
+						uint8_t iMgmtEP, uint8_t iDataEP)
+					: EPBuffer (iDataEP, iDataEP, EP_TYPE::BULK, epBufferRX, blockSize, epBufferTX, blockSize),
+					m_buffer (buffer), m_blockSize (blockSize),
+					m_mgmtEP (iMgmtEP),
+					m_receiving (false) {}
 
 		// Verbiete Kopieren/Zuweisen
 
@@ -86,18 +69,6 @@ class VCP : private EPBuffer {
 		VCP& operator = (VCP&&) = delete;
 
 		void init ();
-		void onDMA_RX_Finish ();
-		void onDMA_TX_Finish ();
-		void onUSART_IRQ ();
-		void confUSART ();
-		bool setLineCoding (const LineCoding& coding);
-		/// Fragt aktuelle Serial-Parameter ab.
-		inline const LineCoding& getLineCoding () { return m_lineCoding; }
-		/// Fragt den empfangenden DMA-Channel ab.
-		inline uint8_t getDMA_RX () { return m_iDMA_RX; }
-		/// Fragt den sendenden DMA-Channel ab.
-		inline uint8_t getDMA_TX () { return m_iDMA_TX; }
-		void setLineState (bool DTR, bool RTS);
 
 #if (__cplusplus >= 201402L)
 		/// Fragt die enthaltene EPBuffer-Instanz für den Management-Endpoint ab.
@@ -114,39 +85,17 @@ class VCP : private EPBuffer {
 		virtual void onReset () override;
 		virtual void onReceive (bool setup, size_t rxBytes) override;
 		virtual void onTransmit () override;
-
-		void setupDMA (uint8_t channel, uint8_t* memBuf, uint16_t length, bool TX);
-		void setupDMA (bool force = false);
-		void clearDMAInt (uint8_t channel);
 		void prepareUSBreceive ();
 		void prepareUSBtransmit ();
-		static constexpr USART_TypeDef* s_usarts [3] = { USART1, USART2, USART3 };
-		/// Gibt den dazugehörigen USART_TypeDef zurück.
-		usb_always_inline USART_TypeDef* usart () const { return s_usarts [m_USART]; }
 
-		/// Die beiden Doppelpuffer für beide Richtungen.
-		DoubleBuffer m_usb2uartBuffer, m_uart2usbBuffer;
-		/// Aktuelle Serial-Parameter.
-		LineCoding m_lineCoding;
+		uint8_t* m_buffer;
+		uint16_t m_blockSize;
+
 		/// Der Management-Endpoint.
 		VCP_MgmtEP m_mgmtEP;
 
-		/// Der Sende-Pin des USART (der Empfangs-Pin wird nicht benötigt, weil der nicht konfiguriert werden muss)
-		Pin m_pinTX;
-		/// Flusskontroll-Pins für RS-232
-		Pin m_pinDTR, m_pinRTS;
-		/// Anzahl der derzeit per USB abzusendenen Bytes
-		size_t m_txUSBBytes;
-		/// Anzahl der derzeit per USART zu empfangenden / sendenden Bytes
-		uint16_t m_rxUSARTBytes, m_txUSARTBytes;
-		/// Der per setLineCoding berechnete Prescaler für den USART.
-		uint16_t m_USART_Prescaler;
-		/// Die Nummer des zugehörigen USART (0-2)
-		const uint8_t m_USART;
-		/// DMA-Channel für den USART (ab 0 zählend)
-		const uint8_t m_iDMA_RX, m_iDMA_TX;
-		/// Ob gerade ein empfangender/sendender Transfer auf USB/USART im Gange ist.
-		bool m_usbReceiving, m_usbTransmitting, m_usartReceiving, m_usartTransmitting;
+		/// Ob gerade ein empfangender auf USB im Gange ist.
+		bool m_receiving;
 };
 
 

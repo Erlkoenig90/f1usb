@@ -44,23 +44,14 @@ alignas(4) static UsbAlloc<64>	EP0_BUF	USB_MEM;
 alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_RX_BUF [3]	USB_MEM;
 alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_TX_BUF [3]	USB_MEM;
 
-/// Der tatsächliche Speicher für die Doppelpuffer der VCP's. Wird hier angelegt zur Initialisierung per ".bss"-Section.
-static uint8_t intBuffers [3][4096];
-
-/*
- * Pinbelegung der drei USARTS. In den Klammern stehen die Zuordnungen für das Olimexino-STM32:
- * VCP0: TX=PA9(D7), RX=PA10(D8), DTR=PA1(D3), RTS=PA5(D13)
- * VCP1: TX=PA2(D1), RX=PA3(D0), DTR=PA6(D12), RTS=PA7(D11)
- * VCP2: TX=PB10(D29), RX=PB11(D30), DTR=PC0(D15), RTS=PC1(D16)
- *
- * PC12 schaltet (per low) den 1.5kOhm Widerstand ein.
- */
+/// Der tatsächliche Speicher für die Puffer der VCP's. Wird hier angelegt zur Initialisierung per ".bss"-Section.
+static uint8_t intBuffers [3][64];
 
 /// Anlegen der drei Verwaltungsobjekte für die drei VCPs.
 VCP vcp [3] = {
-	{ 0, VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, VCP_RX_BUF [0].size, VCP_TX_BUF [0].size, 4, 3, 1, 2, { 0, 9 }, { 0, 1 }, { 0, 5 }, intBuffers[0], sizeof(intBuffers[0]) },
-	{ 1, VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, VCP_RX_BUF [1].size, VCP_TX_BUF [1].size, 5, 6, 3, 4, { 0, 2 }, { 0, 6 }, { 0, 7 }, intBuffers[1], sizeof(intBuffers[1]) },
-	{ 2, VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, VCP_RX_BUF [2].size, VCP_TX_BUF [2].size, 2, 1, 5, 6, { 1, 10 }, { 2, 0 }, { 2, 1 }, intBuffers[2], sizeof(intBuffers[2]) }
+	{ VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, 64, intBuffers [0], 1, 2 },
+	{ VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, 64, intBuffers [1], 3, 4 },
+	{ VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, 64, intBuffers [2], 5, 6 }
 };
 
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.
@@ -75,57 +66,7 @@ USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP,
 
 void initializePeriphalClocks () {
 	// Aktiviere GPIO-Module für die genutzten Pins und USARTs
-	RCC->APB1ENR |= RCC_APB1ENR_USART2EN | RCC_APB1ENR_USART3EN;
-	RCC->APB2ENR |= RCC_APB2ENR_USART1EN | RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
-
-	RCC->AHBENR |= RCC_AHBENR_DMA1EN;
-}
-
-/*
- * Definitionen der Interrupts. Die Aufrufe werden an die entsprechenden Klassen weitergeleitet. In der "isr"-Funktion
- * kann der Aufruf mit Timing-Messungen umgeben werden.
- */
-
-// VCP 0
-
-extern "C" void DMA1_Channel4_IRQHandler () {
-	vcp [0].onDMA_TX_Finish ();
-}
-
-extern "C" void DMA1_Channel5_IRQHandler () {
-	vcp [0].onDMA_RX_Finish ();
-}
-
-extern "C" void USART1_IRQHandler () {
-	vcp [0].onUSART_IRQ ();
-}
-
-// VCP 1
-
-extern "C" void DMA1_Channel6_IRQHandler () {
-	vcp [1].onDMA_RX_Finish ();
-}
-
-extern "C" void DMA1_Channel7_IRQHandler () {
-	vcp [1].onDMA_TX_Finish ();
-}
-
-extern "C" void USART2_IRQHandler () {
-	vcp [1].onUSART_IRQ ();
-}
-
-// VCP 2
-
-extern "C" void DMA1_Channel3_IRQHandler () {
-	vcp [2].onDMA_RX_Finish ();
-}
-
-extern "C" void DMA1_Channel2_IRQHandler () {
-	vcp [2].onDMA_TX_Finish ();
-}
-
-extern "C" void USART3_IRQHandler () {
-	vcp [2].onUSART_IRQ ();
+	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
 }
 
 /**
@@ -144,9 +85,6 @@ int main () {
 
 	// Peripherie-Takte aktivieren
 	initializePeriphalClocks ();
-
-	// Alle VCPs initialisieren
-	for (VCP& p : vcp) p.init ();
 
 	// USB-Peripherie aktivieren
 	usbPhys.init ();
