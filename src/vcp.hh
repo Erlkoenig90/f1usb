@@ -54,7 +54,7 @@ class VCP_MgmtEP : public EPBuffer {
  */
 class VCP : private EPBuffer {
 	public:
-		constexpr VCP (UsbMem* epBufferRX, UsbMem* epBufferTX, uint16_t blockSize, uint8_t* buffer,
+		constexpr VCP (UsbMem* epBufferRX, UsbMem* epBufferTX, size_t blockSize, uint8_t* buffer,
 						uint8_t iMgmtEP, uint8_t iDataEP)
 					: EPBuffer (iDataEP, iDataEP, EP_TYPE::BULK, epBufferRX, blockSize, epBufferTX, blockSize),
 					m_buffer (buffer), m_blockSize (blockSize),
@@ -86,10 +86,10 @@ class VCP : private EPBuffer {
 		virtual void onReceive (bool setup, size_t rxBytes) override;
 		virtual void onTransmit () override;
 		void prepareUSBreceive ();
-		void prepareUSBtransmit ();
+		void prepareUSBtransmit (size_t length);
 
 		uint8_t* m_buffer;
-		uint16_t m_blockSize;
+		size_t m_blockSize;
 
 		/// Der Management-Endpoint.
 		VCP_MgmtEP m_mgmtEP;

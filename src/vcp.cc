@@ -42,7 +42,7 @@ void VCP::onReceive (bool, size_t rxBytes) {
 	// Hole Daten aus USB-Puffer in Doppelpuffer
 	getDataEP ()->getReceivedData (m_buffer, rxBytes);
 
-	prepareUSBtransmit ();
+	prepareUSBtransmit (rxBytes);
 }
 
 /// Wird via VCP_DataEP::onTransmit aufgerufen, wenn per USB Daten vom VCP gesendet wurden.
@@ -57,9 +57,9 @@ void VCP::prepareUSBreceive () {
 	m_receiving = true;
 }
 
-void VCP::prepareUSBtransmit () {
+void VCP::prepareUSBtransmit (size_t length) {
 	m_receiving = false;
-	getDataEP ()->transmitPacket (m_buffer, m_blockSize);
+	getDataEP ()->transmitPacket (m_buffer, length);
 }
 
 /// Da der Management-EP nicht genutzt wird, passiert hier nichts.
