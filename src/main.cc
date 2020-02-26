@@ -45,13 +45,13 @@ alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_RX_BUF [3]	USB_MEM;
 alignas(4) static UsbAlloc<dataEpMaxPacketSize>	VCP_TX_BUF [3]	USB_MEM;
 
 /// Der tatsächliche Speicher für die Puffer der VCP's. Wird hier angelegt zur Initialisierung per ".bss"-Section.
-static uint8_t intBuffers [3][64];
+static uint8_t intBuffers [3][dataEpMaxPacketSize];
 
 /// Anlegen der drei Verwaltungsobjekte für die drei VCPs.
 VCP vcp [3] = {
-	{ VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, 64, intBuffers [0], 1, 2 },
-	{ VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, 64, intBuffers [1], 3, 4 },
-	{ VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, 64, intBuffers [2], 5, 6 }
+	{ VCP_RX_BUF [0].data, VCP_TX_BUF [0].data, dataEpMaxPacketSize, intBuffers [0], 1, 2 },
+	{ VCP_RX_BUF [1].data, VCP_TX_BUF [1].data, dataEpMaxPacketSize, intBuffers [1], 3, 4 },
+	{ VCP_RX_BUF [2].data, VCP_TX_BUF [2].data, dataEpMaxPacketSize, intBuffers [2], 5, 6 }
 };
 
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.
