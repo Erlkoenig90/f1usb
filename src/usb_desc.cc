@@ -62,7 +62,7 @@ static constexpr std::array<Util::EncChar, 66> vcpDescriptor (uint8_t iInterface
 		),
 			// Die CDC Deskriptoren werden genutzt um ein CDC-ACM Gerät zu definieren
 			EncodeDescriptors::CDC::classSpecific (
-				0x10,	// bcdCDC
+				0x110,	// bcdCDC
 				EncodeDescriptors::CDC::unionInterface(
 					static_cast<uint8_t> (iInterface),	// bControlInterface
 					static_cast<uint8_t> (iInterface + 1)	// bSubordinateInterfaces
