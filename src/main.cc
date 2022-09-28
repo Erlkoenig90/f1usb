@@ -26,6 +26,7 @@
 #include "usb.hh"
 #include "main.hh"
 
+static TIM_TypeDef* const timPulse = TIM2;
 extern USBPhys usbPhys;
 
 /* Allokation von Puffern zum Senden/Empfangen auf Endpoints im USB-Pufferspeicher, insg. 512 Bytes
@@ -39,45 +40,51 @@ extern USBPhys usbPhys;
  */
 alignas(4) static UsbAlloc<64> EP0_BUF	USB_MEM;
 
-alignas(4) static UsbAlloc<dataEpMaxPacketSize> EP1_BUF	USB_MEM;
-
 /// Der Default Control Endpoint 0 ist Pflicht für alle USB-Geräte.
 static DefaultControlEP controlEP (usbPhys, 0, EP0_BUF.data, EP0_BUF.size);
 
-/// Lege Endpoint zum Umdrehen der Daten an
-MirrorEP mirrorEP (EP1_BUF.data, EP1_BUF.size);
-
 /// Zentrale Instanz für USB-Zugriff. Übergebe 2 Endpoints.
-USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP, &mirrorEP, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }});
+USBPhys usbPhys (std::array<EPBuffer*, 8> {{ &controlEP, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr }});
 
 void initializePeriphalClocks () {
 	// Aktiviere GPIO-Module für die genutzten Pins
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPCEN;
+	// Aktiviere Timer-Takt
+	RCC->APB1ENR |= RCC_APB1ENR_TIM2EN;
 }
 
-void MirrorEP::onReset () {
-	EPBuffer::onReset ();
-	// Bereite Datenempfang vor
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
+void enablePulseTimer () {
+	timPulse->CR1 = TIM_CR1_OPM | TIM_CR1_URS | TIM_CR1_ARPE;
+	timPulse->DIER = TIM_DIER_UIE;
+
+	timPulse->PSC = 71; // => 1 MHz
+	timPulse->CCR2 = 1;
+	timPulse->ARR = 2;
+
+	timPulse->CCMR1 = TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_0 | TIM_CCMR1_OC2PE;
+	timPulse->CCER = TIM_CCER_CC2E;
+
+	timPulse->EGR = TIM_EGR_UG;
+	timPulse->CR1 = TIM_CR1_OPM; // | TIM_CR1_CEN;
+
+	NVIC_EnableIRQ (TIM2_IRQn);
 }
 
-void MirrorEP::onReceive (bool, size_t rxBytes) {
-	// Frage empfangene Daten ab
-	size_t count = std::min<size_t> (sizeof (m_buffer), rxBytes);
-	getReceivedData (m_buffer, count);
+void outputPulse (std::uint16_t pulse) {
+	timPulse->ARR = pulse;
+	timPulse->CCR2 = 1;
 
-	// Drehe jedes Byte um
-	for (size_t i = 0; i < count; ++i) {
-		m_buffer [i] = static_cast<uint8_t> (__RBIT(m_buffer [i]) >> 24);
+	timPulse->CR1 = TIM_CR1_OPM | TIM_CR1_URS | TIM_CR1_ARPE;
+	timPulse->EGR = TIM_EGR_UG;
+	timPulse->CR1 = TIM_CR1_OPM | TIM_CR1_CEN;
+}
+
+extern "C" void TIM2_IRQHandler () {
+	if (timPulse->SR & TIM_SR_UIF) {
+		timPulse->SR = ~TIM_SR_UIF;
+
+		controlEP.onPulseDone ();
 	}
-
-	// Sende Ergebnis zurück
-	transmitPacket (m_buffer, count);
-}
-
-void MirrorEP::onTransmit () {
-	// Nach erfolgreichem Senden, mache erneut bereit zum Empfangen
-	receivePacket (std::min<size_t> (getRxBufLength(), sizeof (m_buffer)));
 }
 
 /**
@@ -97,8 +104,10 @@ int main () {
 	// Peripherie-Takte aktivieren
 	initializePeriphalClocks ();
 
-	LED1.configureOutput ();
-	LED2.configureOutput ();
+	LED2.configureAFOut ();
+//	LED2.configureOutput ();
+
+	enablePulseTimer ();
 
 	// USB-Peripherie aktivieren
 	usbPhys.init ();

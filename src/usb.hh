@@ -233,6 +233,8 @@ class DefaultControlEP : public ControlEP {
 		DefaultControlEP (DefaultControlEP&&) = delete;
 		DefaultControlEP& operator = (const DefaultControlEP&) = delete;
 		DefaultControlEP& operator = (DefaultControlEP&&) = delete;
+
+		void onPulseDone ();
 	protected:
 		virtual void onReset () override final;
 		virtual void onSetupStage () override final;

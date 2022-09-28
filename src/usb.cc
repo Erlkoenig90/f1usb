@@ -594,18 +594,20 @@ void DefaultControlEP::onSetupStage () {
 		}
 
 	// Ab hier folgen Geräte/Klassen-spezifische Anfragen
-	} else if (m_bmRequestType == 0xC0 && m_bRequest == 2) {
-		// LED Status abfragen.
-		uint8_t data = static_cast<uint8_t> (LED1.getOutput () | (uint8_t { LED2.getOutput () } << 1));
-		dataInStage (&data, 1);
 	} else if (m_bmRequestType == 0x40 && m_bRequest == 1) {
-		LED1.set (m_wValue & 1);
-		LED2.set (m_wValue & 2);
+		outputPulse (m_wValue);
 		statusStage (true);
+	} else if (m_bmRequestType == 0x40 && m_bRequest == 2) {
+		outputPulse (m_wValue);
 	} else {
 		// Unbekannte Anfragen abweisen
 		statusStage (false);
 	}
+}
+
+void DefaultControlEP::onPulseDone () {
+	if (m_bRequest == 2)
+		statusStage (true);
 }
 
 void DefaultControlEP::onDataOut (size_t) {

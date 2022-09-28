@@ -35,16 +35,6 @@ static constexpr uint16_t dataEpMaxPacketSize = 64;
 
 static constexpr Pin LED1 (0, 5), LED2 (0, 1);
 
-/// "Dummy"-Endpoint, welcher ankommende Daten umdreht.
-class MirrorEP : public EPBuffer {
-	public:
-		constexpr MirrorEP (UsbMem* epBuffer, size_t length) : EPBuffer (1, 1, EP_TYPE::BULK, epBuffer, length, epBuffer, length), m_buffer {} {}
-	protected:
-		virtual void onReceive (bool setup, size_t rxBytes);
-		virtual void onTransmit ();
-		virtual void onReset ();
-	private:
-		uint8_t m_buffer [dataEpMaxPacketSize];
-};
+void outputPulse (std::uint16_t pulse);
 
 #endif /* MAIN_HH_ */
